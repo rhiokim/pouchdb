@@ -112,6 +112,10 @@ Ember Data adapter for PouchDB/CouchDB.
 
 Wrapper for using PouchDB within Angular.js.
 
+#### [Factoryng - AngularJS Adapter](https://github.com/redgeoff/factoryng)
+
+An all-in-one AngularJS factory that wraps PouchDB and Delta Pouch.
+
 {% include anchor.html title="Other languages" hash="Other languages" %}
 
 #### [Python-PouchDB](http://python-pouchdb.marten-de-vries.nl/)
@@ -123,10 +127,14 @@ Android adapter with a native Java interface to PouchDB.
 
 {% include anchor.html title="Tools" hash="Tools" %}
 
-#### [Revision Tree Visualizer](http://neojski.github.io/visualizeRevTree)
+#### [blob-util](https://github.com/nolanlawson/blob-util)
 
-A tool drawing revision tree of a couchdb document. You can see what is a conflict, which revisions are deleted and which is winning. ([Github](https://github.com/neojski/visualizeRevTree))
+Not strictly PouchDB-related, but a useful set of shims and utility functions for working with Blobs in the browser.
 
 #### [Puton](http://puton.jit.su/)
 
 A bookmarklet for inspecting PouchDB databases within the browser. ([Github](http://github.com/ymichael/puton))
+
+#### [Revision Tree Visualizer](http://neojski.github.io/visualizeRevTree)
+
+A tool drawing revision tree of a couchdb document. You can see what is a conflict, which revisions are deleted and which is winning. ([Github](https://github.com/neojski/visualizeRevTree))

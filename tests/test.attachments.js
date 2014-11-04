@@ -365,6 +365,29 @@ adapters.forEach(function (adapter) {
       });
     });
 
+    it('Test putAttachment with base64 plaintext', function () {
+      var db = new PouchDB(dbs.name);
+      return db.putAttachment('doc', 'att', null, 'Zm9v', 'text/plain').then(function () {
+        return db.getAttachment('doc', 'att');
+      }).then(function (blob) {
+        return new PouchDB.utils.Promise(function (resolve) {
+          testUtils.base64Blob(blob, function (data) {
+            data.should.equal('Zm9v', 'should get the correct base64 back');
+            resolve();
+          });
+        });
+      });
+    });
+
+    it('Test putAttachment with incorrect base64', function () {
+      var db = new PouchDB(dbs.name);
+      return db.putAttachment('doc', 'att', null, '\u65e5\u672c\u8a9e', 'text/plain').then(function () {
+        throw new Error('shouldnt have gotten here');
+      }, function (err) {
+        should.exist(err);
+      });
+    });
+
     it('Test getAttachment with empty text', function (done) {
       var db = new PouchDB(dbs.name);
       db.put(binAttDoc2, function (err, res) {
@@ -991,6 +1014,98 @@ adapters.forEach(function (adapter) {
             });
           });
         });
+      });
+    });
+
+    it('#2818 - save same attachment in different revs', function () {
+      var db = new PouchDB(dbs.name, {auto_compaction: false});
+
+      return db.put({_id: 'foo'}).then(function (res) {
+        return db.putAttachment('foo', 'att', res.rev, 'Zm9v', 'text/plain');
+      }).then(function () {
+        return db.get('foo', {attachments: true});
+      }).then(function (doc) {
+        doc._attachments['att'].content_type.should.match(/^text\/plain/);
+        should.exist(doc._attachments['att'].data);
+        return db.get('foo');
+      }).then(function (doc) {
+        return db.put(doc);
+      }).then(function () {
+        return db.compact();
+      }).then(function () {
+        return db.get('foo', {attachments: true});
+      }).then(function (doc) {
+        doc._attachments['att'].content_type.should.match(/^text\/plain/);
+        doc._attachments['att'].data.length.should.be.above(0, 'attachment exists');
+      });
+    });
+
+    it('#2818 - save same attachment many times in parallel', function () {
+      var db = new PouchDB(dbs.name);
+      var docs = [];
+
+      for (var i  = 0; i < 50; i++) {
+        docs.push({
+          _id: 'doc' + i,
+          _attachments: {
+            'foo.txt': {
+              content_type: 'text/plain',
+              data: 'Zm9vYmFy' // 'foobar'
+            }
+          }
+        });
+      }
+      return db.bulkDocs(docs);
+    });
+
+    it('#2818 - revisions keep attachments (no compaction)', function () {
+      var db = new PouchDB(dbs.name, {auto_compaction: false});
+      var doc = {
+        _id: 'doc',
+        _attachments: {
+          'foo.txt': {
+            content_type: 'text/plain',
+            data: 'Zm9vYmFy' // 'foobar'
+          }
+        }
+      };
+      var rev;
+      return db.put(doc).then(function () {
+        return db.get('doc');
+      }).then(function (doc) {
+        rev = doc._rev;
+        //delete doc._attachments['foo.txt'];
+        doc._attachments['foo.txt'] = {
+          content_type: 'text/plain',
+          data: 'dG90bw=='
+        }; // 'toto'
+        return db.put(doc);
+      }).then(function () {
+        return db.get('doc', {attachments: true});
+      }).then(function (doc) {
+        doc._attachments['foo.txt'].data.should.equal('dG90bw==');
+        return db.get('doc', {rev: rev, attachments: true});
+      }).then(function (doc) {
+        doc._attachments['foo.txt'].data.should.equal('Zm9vYmFy');
+      });
+    });
+
+    it('#2818 - doesn\'t throw 409 if same filename', function () {
+      var db = new PouchDB(dbs.name, {auto_compaction: false});
+      var doc = {
+        _id: 'doc',
+        _attachments: {
+          'foo.txt': {
+            content_type: 'text/plain',
+            data: 'Zm9vYmFy' // 'foobar'
+          }
+        }
+      };
+      var rev;
+      return db.put(doc).then(function (res) {
+        rev = doc._rev = res.rev;
+        doc._attachments['foo.txt'].data = 'dG90bw=='; // 'toto'
+        return db.put(doc);
       });
     });
 
