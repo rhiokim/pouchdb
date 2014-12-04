@@ -109,6 +109,27 @@ adapters.forEach(function (adapters) {
       });
     });
 
+    it('Test basic pull replication with funny ids', function (done) {
+      var docs = [
+        {_id: '4/5', integer: 0, string: '0'},
+        {_id: '3&2', integer: 1, string: '1'},
+        {_id: '1>0', integer: 2, string: '2'}
+      ];
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+      remote.bulkDocs({docs: docs}, function (err, results) {
+        db.replicate.from(dbs.remote, function (err, result) {
+          result.ok.should.equal(true);
+          result.docs_written.should.equal(docs.length);
+          db.info(function (err, info) {
+            info.update_seq.should.equal(3, 'update_seq');
+            info.doc_count.should.equal(3, 'doc_count');
+            done();
+          });
+        });
+      });
+    });
+
     it('pull replication with many changes + a conflict (#2543)', function () {
       var db = new PouchDB(dbs.remote);
       var remote = new PouchDB(dbs.remote);
@@ -1186,6 +1207,18 @@ adapters.forEach(function (adapters) {
       });
     });
 
+    function waitForChange(db, fun) {
+      return new PouchDB.utils.Promise(function (resolve) {
+        var remoteChanges = db.changes({live: true, include_docs: true});
+        remoteChanges.on('change', function (change) {
+          if (fun(change)) {
+            remoteChanges.cancel();
+            resolve();
+          }
+        });
+      });
+    }
+
     it('Replicates deleted docs (issue #2636)', function () {
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
@@ -1199,16 +1232,14 @@ adapters.forEach(function (adapters) {
           _id: res.id,
           _rev: res.rev
         };
-
         return db.remove(doc);
       }).then(function () {
         return db.allDocs();
       }).then(function (res) {
         res.rows.should.have.length(0, 'deleted locally');
       }).then(function () {
-        // wait for changes to settle
-        return new PouchDB.utils.Promise(function (resolve) {
-          setTimeout(resolve, 5000);
+        return waitForChange(remote, function (change) {
+          return change.deleted === true;
         });
       }).then(function () {
         return remote.allDocs();
@@ -1226,30 +1257,18 @@ adapters.forEach(function (adapters) {
         live: true
       });
 
+      var doc;
       return db.post({}).then(function (res) {
-        var doc = {
-          _id: res.id,
-          _rev: res.rev
-        };
-
-        // this timeout more consistently repros
-        // the issue, so it's not just a race
-        return new PouchDB.utils.Promise(function (resolve) {
-          setTimeout(resolve, 1000);
-        }).then(function () {
-          return doc;
-        });
-      }).then(function (doc) {
+        doc = {_id: res.id, _rev: res.rev};
+        return waitForChange(remote, function () { return true; });
+      }).then(function () {
         return db.remove(doc);
       }).then(function () {
         return db.allDocs();
       }).then(function (res) {
         res.rows.should.have.length(0, 'deleted locally');
       }).then(function () {
-        // wait for changes to settle
-        return new PouchDB.utils.Promise(function (resolve) {
-          setTimeout(resolve, 5000);
-        });
+        return waitForChange(remote, function (c) { return c.seq === 2; });
       }).then(function () {
         return remote.allDocs();
       }).then(function (res) {
@@ -1308,9 +1327,8 @@ adapters.forEach(function (adapters) {
         res.rows.should.have.length(1, 'one doc synced locally');
         res.rows[0].doc.modified.should.equal('yep', 'modified locally');
       }).then(function () {
-        // wait for changes to settle
-        return new PouchDB.utils.Promise(function (resolve) {
-          setTimeout(resolve, 5000);
+        return waitForChange(remote, function (change) {
+          return change.doc.modified === 'yep';
         });
       }).then(function () {
         return remote.allDocs({include_docs: true});
@@ -2430,6 +2448,7 @@ adapters.forEach(function (adapters) {
       });
       remote.put({}, 'hazaa');
     });
+
     it('retry stuff', function (done) {
       var remote = new PouchDB(dbs.remote);
       var Promise = PouchDB.utils.Promise;
@@ -2488,12 +2507,97 @@ adapters.forEach(function (adapters) {
       });
       remote.put({}, 'hazaa');
     });
-    if (adapters[1] === 'http') {
-      // test validate_doc_update, which is a reasonable substitute
-      // for testing design doc replication of non-admin users, since we
-      // always test in admin party
 
-      it('#2268 don\'t stop replication if single forbidden', function () {
+    it('#2970 should replicate remote database w/ deleted conflicted revs',
+        function (done) {
+      var local = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+      var docid = "mydoc";
+
+      function uuid() {
+        return PouchDB.utils.uuid(32, 16).toLowerCase();
+      }
+      
+      // create a bunch of rando, good revisions
+      var numRevs = 5;
+      var uuids = [];
+      for (var i = 0; i < numRevs - 1; i++) {
+        uuids.push(uuid());
+      }
+
+      // good branch
+      // this branch is one revision ahead of the conflicted branch
+      var a_conflict = uuid();
+      var a_burner = uuid();
+      var a_latest = uuid();
+      var a_rev_num = numRevs + 2;
+      var a_doc = {
+        _id: docid,
+        _rev: a_rev_num + '-' + a_latest,
+        _revisions: {
+          start: a_rev_num,
+          ids: [ a_latest, a_burner, a_conflict ].concat(uuids)
+        }
+      };
+
+      // conflicted deleted branch
+      var b_conflict = uuid();
+      var b_deleted = uuid();
+      var b_rev_num = numRevs + 1;
+      var b_doc = {
+        _id: docid,
+        _rev: b_rev_num + '-' + b_deleted,
+        _deleted: true,
+        _revisions: {
+          start: b_rev_num,
+          ids: [ b_deleted, b_conflict ].concat(uuids)
+        }
+      };
+
+      // push the conflicted documents
+      return remote.bulkDocs([ a_doc, b_doc ], {
+        new_edits: false
+      }).then(function () {
+        return remote.get(docid, { open_revs: 'all' }).then(function (revs) {
+          revs.length.should.equal(2, 'correct number of open revisions');
+          revs[0].ok._id.should.equal(docid, 'rev 1, correct document id');
+          revs[1].ok._id.should.equal(docid, 'rev 2, correct document id');
+          // order of revisions is not specified
+          ((
+            revs[0].ok._rev === a_doc._rev &&
+            revs[1].ok._rev === b_doc._rev) ||
+          (
+            revs[0].ok._rev === b_doc._rev &&
+            revs[1].ok._rev === a_doc._rev)
+          ).should.equal(true);
+        });
+      })
+
+      // attempt to replicate
+      .then(function () {
+        return local.replicate.from(remote).then(function (result) {
+          result.ok.should.equal(true, 'replication result was ok');
+          // # of documents is 2 because deleted
+          // conflicted revision counts as one
+          result.docs_written.should.equal(2,
+            'replicated the correct number of documents');
+        });
+      })
+
+      .then(function () { done(); }, done);
+    });
+
+
+    // test validate_doc_update, which is a reasonable substitute
+    // for testing design doc replication of non-admin users, since we
+    // always test in admin party
+    it('#2268 dont stop replication if single forbidden', function (done) {
+
+      testUtils.isCouchDB(function (isCouchDB) {
+        if (adapters[1] !== 'http' || !isCouchDB) {
+          return done();
+        }
+
         var ddoc = {
           "_id": "_design/validate",
           "validate_doc_update": function (newDoc) {
@@ -2524,10 +2628,17 @@ adapters.forEach(function (adapters) {
           return db.allDocs({limit: 0});
         }).then(function (res) {
           res.total_rows.should.equal(4); // 3 plus the invalid doc
-        });
+        }).then(done);
       });
+    });
 
-      it('#2268 don\'t stop replication if single unauthorized', function () {
+    it('#2268 dont stop replication if single unauth', function (done) {
+
+      testUtils.isCouchDB(function (isCouchDB) {
+        if (adapters[1] !== 'http' || !isCouchDB) {
+          return done();
+        }
+
         var ddoc = {
           "_id": "_design/validate",
           "validate_doc_update": function (newDoc) {
@@ -2558,10 +2669,17 @@ adapters.forEach(function (adapters) {
           return db.allDocs({limit: 0});
         }).then(function (res) {
           res.total_rows.should.equal(4); // 3 plus the invalid doc
-        });
+        }).then(done);
       });
+    });
 
-      it('#2268 don\'t stop replication if many unauthorized', function () {
+    it('#2268 dont stop replication if many unauth', function (done) {
+
+      testUtils.isCouchDB(function (isCouchDB) {
+        if (adapters[1] !== 'http' || !isCouchDB) {
+          return done();
+        }
+
         var ddoc = {
           "_id": "_design/validate",
           "validate_doc_update": function (newDoc) {
@@ -2576,7 +2694,7 @@ adapters.forEach(function (adapters) {
 
         return remote.put(ddoc).then(function () {
           var docs = [{foo: 'bar'}, {foo: 'baz'}, {}, {foo: 'quux'}, {}, {},
-            {foo: 'toto'}, {}];
+                      {foo: 'toto'}, {}];
           return db.bulkDocs({docs: docs});
         }).then(function () {
           return db.replicate.to(dbs.remote);
@@ -2593,9 +2711,10 @@ adapters.forEach(function (adapters) {
           return db.allDocs({limit: 0});
         }).then(function (res) {
           res.total_rows.should.equal(8); // 4 valid and 4 invalid
-        });
+        }).then(done);
       });
-    }
+    });
+
   });
 });
 
