@@ -466,6 +466,21 @@ adapters.forEach(function (adapter) {
       });
     });
 
+    it('update with invalid rev', function (done) {
+      var db = new PouchDB(dbs.name);
+      db.post({test: 'somestuff'}, function (err, info) {
+        db.put({
+          _id: info.id,
+          _rev: 'undefined',
+          another: 'test'
+        }, function (err, info2) {
+          should.exist(err);
+          err.message.should.equal('Invalid rev format');
+          done();
+        });
+      });
+    });
+
     it('Doc validation', function (done) {
       var bad_docs = [
         {'_zing': 4},
@@ -894,6 +909,37 @@ adapters.forEach(function (adapter) {
         return db.put({_id: 'foo', _rev: rev});
       }).then(function () {
         return checkNumRevisions(3);
+      });
+    });
+
+    it('issue 2888, successive deletes and writes', function () {
+      var db = new PouchDB(dbs.name);
+      var rev;
+
+      function checkNumRevisions(num) {
+        return db.get('foo', {
+          open_revs: 'all',
+          revs: true
+        }).then(function (fullDocs) {
+          fullDocs[0].ok._revisions.ids.should.have.length(num);
+        });
+      }
+      return db.put({ _id: 'foo' }).then(function (resp) {
+        rev = resp.rev;
+        return checkNumRevisions(1);
+      }).then(function () {
+        return db.remove('foo', rev);
+      }).then(function () {
+        return checkNumRevisions(2);
+      }).then(function () {
+        return db.put({ _id: 'foo' });
+      }).then(function (res) {
+        rev = res.rev;
+        return checkNumRevisions(3);
+      }).then(function () {
+        return db.remove('foo', rev);
+      }).then(function () {
+        return checkNumRevisions(4);
       });
     });
 

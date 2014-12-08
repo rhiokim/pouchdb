@@ -45,7 +45,7 @@ User agent sniffing! Yes, we should be ashamed of ourselves. But here's why we d
 
 For the recored, here's what the dreaded Safari popup looks like:
 
-<img src='/static/img/safari_popup.png' alt='annoying Safari popup'/>
+{% include img.html src="safari_popup.png" alt="annoying Safari popup" %}
 
 So that's why we sniff for Android and only bump the size to 5000000 in those cases. In all other cases, we set it to 1.
 
@@ -54,7 +54,7 @@ Additionally, the W3C has done everyone a disservice by using `5*1024*1024` in [
 
 ### 2. IE has race conditions in IndexedDB
 
-Microsoft has a very fast implementation of IndexedDB &ndash; it's a bit slower than Chrome's, but much faster than Firefox's ([here are some tests](https://gist.github.com/nolanlawson/11100235)). However, to get that speed, they must have taken some shortcuts, becuase both IE10 and IE11 have some [nasty](https://connect.microsoft.com/IE/feedbackdetail/view/1009247) [race](https://connect.microsoft.com/IE/feedbackdetail/view/866489) [conditions](https://connect.microsoft.com/IE/feedbackdetail/view/866495).
+Microsoft has a very fast implementation of IndexedDB &ndash; it's a bit slower than Chrome's, but much faster than Firefox's ([here are some tests](https://gist.github.com/nolanlawson/11100235)). However, to get that speed, they must have taken some shortcuts, because both IE10 and IE11 have some [nasty](https://connect.microsoft.com/IE/feedbackdetail/view/1009247) [race](https://connect.microsoft.com/IE/feedbackdetail/view/866489) [conditions](https://connect.microsoft.com/IE/feedbackdetail/view/866495).
 
 Due to that, you'll often see PouchDB code [like this](https://github.com/pouchdb/pouchdb/blob/c32597564160dcaad7b3e715ddf1c0dc923b59cd/lib/adapters/idb.js#L1369-L1372): 
 
@@ -231,7 +231,7 @@ This also heavily influenced our design for [persistent map/reduce](http://pouch
 
 ### 6. IndexedDB throws an error if you try to iterate backwards with start/end keys
 
-This is one of those wonderful "bugs" that is actually part of the IndexedDB spec, so it's faithfully reproduced in all three of Firefox, Chrome, and IE. I guess we should be thankful?
+This is one of those wonderful "bugs" that is actually part of the IndexedDB spec, so it's faithfully reproduced in all three of Firefox, IE, and Chrome. I guess we should be thankful?
 
 Anyway, [here's the code](https://github.com/pouchdb/pouchdb/blob/c32597564160dcaad7b3e715ddf1c0dc923b59cd/lib/adapters/idb.js#L746-L776):
 
@@ -386,6 +386,8 @@ db.createObjectStore('employees').createIndex('id', 'id', {unique: true});
 ```
 
 Better hope you choose the right one the first time! Otherwise you may get a constraint error when you don't expect one, or vice versa.
+
+**Edit:** As pointed out by [Simon Friis Vindum](https://twitter.com/paldepind/status/539012069061033984), you can use `add()` instead of `put()` to get a constraint error with keyPaths. Here's [a live example](http://bl.ocks.org/nolanlawson/c9a4673830de2b185b8b). Thanks for the tip!
 
 ### 10. CouchDB influenced IndexedDB influenced LevelDB influenced...
 
