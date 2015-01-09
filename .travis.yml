@@ -20,18 +20,14 @@ before_script:
   - "sudo sed -i 's/^127\\.0\\.0\\.1.*$/127.0.0.1 localhost/' /etc/hosts"
 
     # Lets know what CouchDB we are playing with
-    # and make sure its logging debug
   - "curl -X GET http://127.0.0.1:5984/"
-  - "curl -X PUT http://127.0.0.1:5984/_config/log/level -d '\"debug\"'"
 
-
-after_failure:
-  - "curl -X GET http://127.0.0.1:5984/_log?bytes=1000000"
 
 script: npm run $COMMAND
 
 env:
   global:
+  - SELENIUM_VERSION=2.42.0
   - secure: "WYQbfTXYwPfqz7t3ycqpXIDQdZ7C9kQJAP+08OF0cuR8eqhm7HxCiu9LjSNqoLAdlDmc55ygeS16Kn3Oht3zZ/i2Y7Gm75HcQfzUIb1sDv1xVm3aQmqZDJfAQ/r7fN8upBCLii/W8IUkJr1k717MpbdsTerIjyfPOb27hw0kJTM="
   - secure: "Ut9pRqzbVJHxg8vt1Cx0bTv4HAroBkvOLjtHF+11f/OzfNnAORIEPnJFHqGbOTozCPOizmzgwvCGqq9gYL8SakrfiI0wBfaL+lk0ub/FPuJ1+hwrLDU0Ju4O5reL0OSu0JB+OTmXfILuRQQkD9/7uwUEbLDFId4phSq3cz1UsK0="
   - secure: "MiufQQKR/EBoS7kcau/I7oYenVilysEqwx37zdgLEKlEUe3SxVOe31uLZv/bhfLNZiRuLAfmIOZmhLGnhMf0LaBzR2yC5qhBxrVHcAiTuS3q6zxpzEf02jnu+hACvj1kJJEPjpOLpEVx7ghWL4McEO0qLbdtSbQlm2IkOX1ONg0="
@@ -59,8 +55,8 @@ env:
 
   # Testing in saucelabs
   - CLIENT=saucelabs:chrome COMMAND=test
+  - CLIENT=saucelabs:chrome:36 COMMAND=test
   - CLIENT=saucelabs:chrome:37 COMMAND=test
-  - CLIENT=saucelabs:chrome ADAPTERS=websql COMMAND=test
   - CLIENT=saucelabs:safari:6 COMMAND=test
   - CLIENT="saucelabs:iphone:7.1:OS X 10.9" COMMAND=test
   - CLIENT="saucelabs:internet explorer:10:Windows 8" COMMAND=test
@@ -68,20 +64,24 @@ env:
   - CLIENT=selenium:firefox ADAPTERS=memory COMMAND=test
   - CLIENT=selenium:firefox ADAPTERS=idb-alt COMMAND=test
   - CLIENT=selenium:firefox ADAPTERS=localstorage COMMAND=test
-  - CLIENT=selenium:firefox PERF=1 COMMAND=test
 
   # Test CouchDB master (aka bigcouch branch)
-  - CLIENT=node SERVER=couchdb-master COMMAND=test
-  - CLIENT=selenium:firefox SERVER=couchdb-master COMMAND=test
+  - BAIL=0 CLIENT=node SERVER=couchdb-master COMMAND=test
+  - BAIL=0 CLIENT=selenium:firefox SERVER=couchdb-master COMMAND=test
+
+  # Performance tests
+  - CLIENT=selenium:firefox PERF=1 COMMAND=test
+  - PERF=1 COMMAND=test
 
   - CLIENT=unit COMMAND=test
-  - PERF=1 COMMAND=test
   - COMMAND=report-coverage
 
 matrix:
  allow_failures:
  - env: CLIENT="saucelabs:internet explorer:10:Windows 8" COMMAND=test
  - env: CLIENT="saucelabs:iphone:7.1:OS X 10.9" COMMAND=test
+ - env: BAIL=0 CLIENT=node SERVER=couchdb-master COMMAND=test
+ - env: BAIL=0 CLIENT=selenium:firefox SERVER=couchdb-master COMMAND=test
  fast_finish: true
 
 branches:

@@ -36,6 +36,37 @@ adapters.forEach(function (adapters) {
       {_id: '2', integer: 2, string: '2'}
     ];
 
+    // simplify for easier deep equality checks
+    function simplifyChanges(res) {
+      var changes = res.results.map(function (change) {
+        return {
+          id: change.id,
+          deleted: change.deleted,
+          changes: change.changes.map(function (x) {
+            return x.rev;
+          }).sort(),
+          doc: change.doc
+        };
+      });
+
+      // in CouchDB 2.0, changes is not guaranteed to be
+      // ordered
+      if (testUtils.isCouchMaster()) {
+        changes.sort(function (a, b) {
+          return a.id > b.id;
+        });
+      }
+
+      return changes;
+    }
+
+    function verifyInfo(info, expected) {
+      if (!testUtils.isCouchMaster()) {
+        info.update_seq.should.equal(expected.update_seq, 'update_seq');
+      }
+      info.doc_count.should.equal(expected.doc_count, 'doc_count');
+    }
+
     it('Test basic pull replication', function (done) {
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
@@ -44,8 +75,10 @@ adapters.forEach(function (adapters) {
           result.ok.should.equal(true);
           result.docs_written.should.equal(docs.length);
           db.info(function (err, info) {
-            info.update_seq.should.equal(3, 'update_seq');
-            info.doc_count.should.equal(3, 'doc_count');
+            verifyInfo(info, {
+              update_seq: 3,
+              doc_count: 3
+            });
             done();
           });
         });
@@ -59,8 +92,10 @@ adapters.forEach(function (adapters) {
           result.ok.should.equal(true);
           result.docs_written.should.equal(docs.length);
           new PouchDB(dbs.name).info(function (err, info) {
-            info.update_seq.should.equal(3, 'update_seq');
-            info.doc_count.should.equal(3, 'doc_count');
+            verifyInfo(info, {
+              update_seq: 3,
+              doc_count: 3
+            });
             done();
           });
         });
@@ -75,8 +110,10 @@ adapters.forEach(function (adapters) {
             result.ok.should.equal(true);
             result.docs_written.should.equal(docs.length);
             new PouchDB(dbs.name).info(function (err, info) {
-              info.update_seq.should.equal(3, 'update_seq');
-              info.doc_count.should.equal(3, 'doc_count');
+              verifyInfo(info, {
+                update_seq: 3,
+                doc_count: 3
+              });
               done();
             });
           }
@@ -122,8 +159,10 @@ adapters.forEach(function (adapters) {
           result.ok.should.equal(true);
           result.docs_written.should.equal(docs.length);
           db.info(function (err, info) {
-            info.update_seq.should.equal(3, 'update_seq');
-            info.doc_count.should.equal(3, 'doc_count');
+            verifyInfo(info, {
+              update_seq: 3,
+              doc_count: 3
+            });
             done();
           });
         });
@@ -333,10 +372,14 @@ adapters.forEach(function (adapters) {
             db.allDocs(function (err, result) {
               result.rows.length.should.equal(docs.length);
               db.info(function (err, info) {
-                info.update_seq.should.be.above(2, 'update_seq local');
+                if (!testUtils.isCouchMaster()) {
+                  info.update_seq.should.be.above(2, 'update_seq local');
+                }
                 info.doc_count.should.equal(3, 'doc_count local');
                 remote.info(function (err, info) {
-                  info.update_seq.should.be.above(2, 'update_seq remote');
+                  if (!testUtils.isCouchMaster()) {
+                    info.update_seq.should.be.above(2, 'update_seq remote');
+                  }
                   info.doc_count.should.equal(3, 'doc_count remote');
                   done();
                 });
@@ -354,8 +397,10 @@ adapters.forEach(function (adapters) {
           result.ok.should.equal(true);
           result.docs_written.should.equal(docs.length);
           db.info(function (err, info) {
-            info.update_seq.should.equal(3);
-            info.doc_count.should.equal(3);
+            verifyInfo(info, {
+              update_seq: 3,
+              doc_count: 3
+            });
             done();
           });
         });
@@ -370,8 +415,10 @@ adapters.forEach(function (adapters) {
           remote.allDocs(function (err, result) {
             result.rows.length.should.equal(docs.length);
             db.info(function (err, info) {
-              info.update_seq.should.equal(3);
-              info.doc_count.should.equal(3);
+              verifyInfo(info, {
+                update_seq: 3,
+                doc_count: 3
+              });
               done();
             });
           });
@@ -390,8 +437,10 @@ adapters.forEach(function (adapters) {
             db.replicate.to(dbs.remote, function (err, result) {
               result.docs_read.should.equal(0);
               db.info(function (err, info) {
-                info.update_seq.should.equal(1);
-                info.doc_count.should.equal(1);
+                verifyInfo(info, {
+                  update_seq: 1,
+                  doc_count: 1
+                });
                 done();
               });
             });
@@ -412,8 +461,10 @@ adapters.forEach(function (adapters) {
             result.docs_written.should.equal(0);
             result.docs_read.should.equal(0);
             db.info(function (err, info) {
-              info.update_seq.should.equal(3);
-              info.doc_count.should.equal(3);
+              verifyInfo(info, {
+                update_seq: 3,
+                doc_count: 3
+              });
               done();
             });
           });
@@ -440,8 +491,10 @@ adapters.forEach(function (adapters) {
               complete: function (err, details) {
                 details.docs_read.should.equal(0);
                 db.info(function (err, info) {
-                  info.update_seq.should.equal(3);
-                  info.doc_count.should.equal(3);
+                  verifyInfo(info, {
+                    update_seq: 3,
+                    doc_count: 3
+                  });
                   done();
                 });
               }
@@ -466,8 +519,10 @@ adapters.forEach(function (adapters) {
             complete: function (err, details) {
               details.docs_read.should.equal(0);
               db.info(function (err, info) {
-                info.update_seq.should.equal(3);
-                info.doc_count.should.equal(3);
+                verifyInfo(info, {
+                  update_seq: 3,
+                  doc_count: 3
+                });
                 done();
               });
             }
@@ -508,8 +563,10 @@ adapters.forEach(function (adapters) {
                 result.ok.should.equal(true);
                 result.docs_written.should.equal(1);
                 db.info(function (err, info) {
-                  info.update_seq.should.equal(2);
-                  info.doc_count.should.equal(1);
+                  verifyInfo(info, {
+                    update_seq: 2,
+                    doc_count: 1
+                  });
                   done();
                 });
               });
@@ -536,11 +593,406 @@ adapters.forEach(function (adapters) {
                 result.ok.should.equal(true);
                 result.docs_written.should.equal(1);
                 db.info(function (err, info) {
-                  info.update_seq.should.equal(3);
-                  info.doc_count.should.equal(1);
+                  verifyInfo(info, {
+                    update_seq: 3,
+                    doc_count: 1
+                  });
                   done();
                 });
               });
+            });
+          });
+        });
+      });
+    });
+
+    it('#3136 open revs returned correctly 1', function () {
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      var doc = {_id: 'foo'};
+      var firstRev;
+
+      var chain = PouchDB.utils.Promise.resolve().then(function () {
+        return db.put(doc).then(function (info) {
+          firstRev = info.rev;
+        });
+      });
+
+      function addConflict(i) {
+        chain = chain.then(function () {
+          return db.bulkDocs({
+            docs: [{
+              _id: 'foo',
+              _rev: '2-' + i
+            }],
+            new_edits: false
+          });
+        });
+      }
+
+      for (var i = 0; i < 50; i++) {
+        addConflict(i);
+      }
+      return chain.then(function () {
+        var revs1;
+        var revs2;
+        return db.get('foo', {
+          conflicts: true,
+          revs: true,
+          open_revs: 'all'
+        }).then(function (res) {
+          revs1 = res.map(function (x) {
+            return x.ok._rev;
+          }).sort();
+          return db.replicate.to(remote);
+        }).then(function () {
+          return remote.get('foo', {
+            conflicts: true,
+            revs: true,
+            open_revs: 'all'
+          });
+        }).then(function (res) {
+          revs2 = res.map(function (x) {
+            return x.ok._rev;
+          }).sort();
+          revs1.should.deep.equal(revs2);
+        });
+      });
+    });
+
+    it('#3136 open revs returned correctly 2', function () {
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      var doc = {_id: 'foo'};
+      var firstRev;
+
+      var chain = PouchDB.utils.Promise.resolve().then(function () {
+        return db.put(doc).then(function (info) {
+          firstRev = info.rev;
+        });
+      });
+
+      function addConflict(i) {
+        chain = chain.then(function () {
+          return db.bulkDocs({
+            docs: [{
+              _id: 'foo',
+              _rev: '2-' + i,
+              _deleted: (i % 3 === 1)
+            }],
+            new_edits: false
+          });
+        });
+      }
+
+      for (var i = 0; i < 50; i++) {
+        addConflict(i);
+      }
+      return chain.then(function () {
+        var revs1;
+        var revs2;
+        return db.get('foo', {
+          conflicts: true,
+          revs: true,
+          open_revs: 'all'
+        }).then(function (res) {
+          revs1 = res.map(function (x) {
+            return x.ok._rev;
+          }).sort();
+          return db.replicate.to(remote);
+        }).then(function () {
+          return remote.get('foo', {
+            conflicts: true,
+            revs: true,
+            open_revs: 'all'
+          });
+        }).then(function (res) {
+          revs2 = res.map(function (x) {
+            return x.ok._rev;
+          }).sort();
+          revs1.should.deep.equal(revs2);
+        });
+      });
+    });
+
+    it('#3136 winningRev has a lower seq', function () {
+      var db1 = new PouchDB(dbs.name);
+      var db2 = new PouchDB(dbs.remote);
+      var tree = [
+        [
+          {_id: 'foo', _rev: '1-a',
+           _revisions: {start: 1, ids: ['a']}},
+          {_id: 'foo', _rev: '2-e', _deleted: true,
+           _revisions: { start: 2, ids: ['e', 'a']}},
+          {_id: 'foo', _rev: '3-g',
+           _revisions: { start: 3, ids: ['g', 'e', 'a']}}
+        ],
+        [
+          {_id: 'foo', _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}},
+          {_id: 'foo', _rev: '2-b',
+            _revisions: {start: 2, ids: ['b', 'a']}},
+          {_id: 'foo', _rev: '3-c',
+            _revisions: {start: 3, ids: ['c', 'b', 'a']}}
+        ],
+        [
+          {_id: 'foo', _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}},
+          {_id: 'foo', _rev: '2-d',
+            _revisions: {start: 2, ids: ['d', 'a']}},
+          {_id: 'foo', _rev: '3-h',
+            _revisions: {start: 3, ids: ['h', 'd', 'a']}},
+          {_id: 'foo', _rev: '4-f',
+            _revisions: {start: 4, ids: ['f', 'h', 'd', 'a']}}
+        ]
+      ];
+
+      var chain = PouchDB.utils.Promise.resolve();
+      tree.forEach(function (docs) {
+        chain = chain.then(function () {
+          var revs1;
+          var revs2;
+
+          return db1.bulkDocs({
+            docs: docs,
+            new_edits: false
+          }).then(function () {
+            return db1.replicate.to(db2);
+          }).then(function () {
+            return db1.get('foo', {
+              open_revs: 'all',
+              revs: true,
+              conflicts: true
+            });
+          }).then(function (res1) {
+            revs1 = res1.map(function (x) {
+              return x.ok._rev;
+            }).sort();
+
+            return db2.get('foo', {
+              open_revs: 'all',
+              revs: true,
+              conflicts: true
+            });
+          }).then(function (res2) {
+            revs2 = res2.map(function (x) {
+              return x.ok._rev;
+            }).sort();
+            revs1.should.deep.equal(revs2, 'same revs');
+          });
+        });
+      });
+      return chain;
+    });
+
+    it('#3136 same changes with style=all_docs', function () {
+      var db1 = new PouchDB(dbs.name);
+      var db2 = new PouchDB(dbs.remote);
+      var tree = [
+        [
+          {_id: 'foo', _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}},
+          {_id: 'foo', _rev: '2-e', _deleted: true,
+            _revisions: { start: 2, ids: ['e', 'a']}},
+          {_id: 'foo', _rev: '3-g',
+            _revisions: { start: 3, ids: ['g', 'e', 'a']}}
+        ],
+        [
+          {_id: 'foo', _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}},
+          {_id: 'foo', _rev: '2-b',
+            _revisions: {start: 2, ids: ['b', 'a']}},
+          {_id: 'foo', _rev: '3-c',
+            _revisions: {start: 3, ids: ['c', 'b', 'a']}}
+        ],
+        [
+          {_id: 'foo', _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}},
+          {_id: 'foo', _rev: '2-d',
+            _revisions: {start: 2, ids: ['d', 'a']}},
+          {_id: 'foo', _rev: '3-h',
+            _revisions: {start: 3, ids: ['h', 'd', 'a']}},
+          {_id: 'foo', _rev: '4-f',
+            _revisions: {start: 4, ids: ['f', 'h', 'd', 'a']}}
+        ]
+      ];
+
+      var chain = PouchDB.utils.Promise.resolve();
+      tree.forEach(function (docs) {
+        chain = chain.then(function () {
+          var changes1;
+          var changes2;
+
+          return db1.bulkDocs({
+            docs: docs,
+            new_edits: false
+          }).then(function () {
+            return db1.replicate.to(db2);
+          }).then(function () {
+            return db1.changes({style: 'all_docs'});
+          }).then(function (res1) {
+            changes1 = simplifyChanges(res1);
+            return db2.changes({style: 'all_docs'});
+          }).then(function (res2) {
+            changes2 = simplifyChanges(res2);
+
+            changes1.should.deep.equal(changes2, 'same changes');
+          });
+        });
+      });
+      return chain;
+    });
+
+    it('#3136 style=all_docs with conflicts', function () {
+      // blocked on COUCHDB-2518
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+
+      var docs1 = [
+        {_id: '0', integer: 0},
+        {_id: '1', integer: 1},
+        {_id: '2', integer: 2},
+        {_id: '3', integer: 3},
+      ];
+      var docs2 = [
+        {_id: '2', integer: 11},
+        {_id: '3', integer: 12},
+      ];
+      var rev2;
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+      return db.bulkDocs({ docs: docs1 }).then(function (info) {
+        docs2[0]._rev = info[2].rev;
+        docs2[1]._rev = info[3].rev;
+        return db.put(docs2[0]);
+      }).then(function () {
+        return db.put(docs2[1]);
+      }).then(function (info) {
+        rev2 = info.rev;
+        return PouchDB.replicate(db, remote);
+      }).then(function () {
+        // update remote once, local twice, then replicate from
+        // remote to local so the remote losing conflict is later in
+        // the tree
+        return db.put({
+          _id: '3',
+          _rev: rev2,
+          integer: 20
+        });
+      }).then(function (resp) {
+        var rev3Doc = {
+          _id: '3',
+          _rev: resp.rev,
+          integer: 30
+        };
+        return db.put(rev3Doc);
+      }).then(function () {
+        var rev4Doc = {
+          _id: '3',
+          _rev: rev2,
+          integer: 100
+        };
+        return remote.put(rev4Doc).then(function () {
+          return PouchDB.replicate(remote, db).then(function () {
+            return PouchDB.replicate(db, remote);
+          }).then(function () {
+            return db.changes({
+              include_docs: true,
+              style: 'all_docs',
+              conflicts: true
+            });
+          }).then(function (localChanges) {
+            return remote.changes({
+              include_docs: true,
+              style: 'all_docs',
+              conflicts: true
+            }).then(function (remoteChanges) {
+              localChanges = simplifyChanges(localChanges);
+              remoteChanges = simplifyChanges(remoteChanges);
+
+              localChanges.should.deep.equal(remoteChanges,
+                'same changes');
+            });
+          });
+        });
+      });
+    });
+
+    it('#3136 style=all_docs with conflicts reversed', function () {
+      // blocked on COUCHDB-2518
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+
+      var docs1 = [
+        {_id: '0', integer: 0},
+        {_id: '1', integer: 1},
+        {_id: '2', integer: 2},
+        {_id: '3', integer: 3},
+      ];
+      var docs2 = [
+        {_id: '2', integer: 11},
+        {_id: '3', integer: 12},
+      ];
+      var rev2;
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+      return db.bulkDocs({ docs: docs1 }).then(function (info) {
+        docs2[0]._rev = info[2].rev;
+        docs2[1]._rev = info[3].rev;
+        return db.put(docs2[0]);
+      }).then(function () {
+        return db.put(docs2[1]);
+      }).then(function (info) {
+        rev2 = info.rev;
+        return PouchDB.replicate(db, remote);
+      }).then(function () {
+        // update remote once, local twice, then replicate from
+        // remote to local so the remote losing conflict is later in
+        // the tree
+        return db.put({
+          _id: '3',
+          _rev: rev2,
+          integer: 20
+        });
+      }).then(function (resp) {
+        var rev3Doc = {
+          _id: '3',
+          _rev: resp.rev,
+          integer: 30
+        };
+        return db.put(rev3Doc);
+      }).then(function () {
+        var rev4Doc = {
+          _id: '3',
+          _rev: rev2,
+          integer: 100
+        };
+        return remote.put(rev4Doc).then(function () {
+          return PouchDB.replicate(remote, db).then(function () {
+            return PouchDB.replicate(db, remote);
+          }).then(function () {
+            return db.changes({
+              include_docs: true,
+              style: 'all_docs',
+              conflicts: true,
+              descending: true
+            });
+          }).then(function (localChanges) {
+            return remote.changes({
+              include_docs: true,
+              style: 'all_docs',
+              conflicts: true,
+              descending: true
+            }).then(function (remoteChanges) {
+              localChanges = simplifyChanges(localChanges);
+              remoteChanges = simplifyChanges(remoteChanges);
+
+              localChanges.should.deep.equal(remoteChanges,
+                'same changes');
             });
           });
         });
@@ -585,8 +1037,10 @@ adapters.forEach(function (adapters) {
         result.ok.should.equal(true);
         result.docs_written.should.equal(1);
         db.info(function (err, info) {
-          info.update_seq.should.equal(3);
-          info.doc_count.should.equal(1);
+          verifyInfo(info, {
+            update_seq: 3,
+            doc_count: 1
+          });
           done();
         });
       }, function (a) {
@@ -639,11 +1093,15 @@ adapters.forEach(function (adapters) {
                                   // if auto_compaction is enabled, will
                                   // be 5 because 2-c goes "missing" and
                                   // the other db tries to re-put it
-                                  info.update_seq.should.be.within(4, 5);
+                                  if (!testUtils.isCouchMaster()) {
+                                    info.update_seq.should.be.within(4, 5);
+                                  }
                                   info.doc_count.should.equal(1);
                                   db2.info(function (err, info2) {
-                                    info2.update_seq.should.equal(3);
-                                    info2.doc_count.should.equal(1);
+                                    verifyInfo(info2, {
+                                      update_seq: 3,
+                                      doc_count: 1
+                                    });
                                     done();
                                   });
                                 });
@@ -676,8 +1134,10 @@ adapters.forEach(function (adapters) {
             remote.get('adoc', { conflicts: true }, function (err, result) {
               result.should.have.property('_conflicts');
               db.info(function (err, info) {
-                info.update_seq.should.equal(1);
-                info.doc_count.should.equal(1);
+                verifyInfo(info, {
+                  update_seq: 1,
+                  doc_count: 1
+                });
                 done();
               });
             });
@@ -691,25 +1151,34 @@ adapters.forEach(function (adapters) {
       var remote = new PouchDB(dbs.remote);
       var doc1 = {_id: 'adoc', foo: 'bar'};
       var doc2 = {_id: 'adoc', bar: 'baz'};
-      db.put(doc1, function (err, localres) {
-        remote.put(doc2, function (err, remoteres) {
-          db.replicate.to(dbs.remote, function (err, _) {
-            var queryFun = {
-              map: function (doc) {
-                if (doc._conflicts) {
-                  emit(doc._id, [doc._rev].concat(doc._conflicts));
-                }
+      var ddoc = {
+        "_id": "_design/conflicts",
+        views: {
+          conflicts: {
+            map: function (doc) {
+              if (doc._conflicts) {
+                emit(doc._id, [doc._rev].concat(doc._conflicts));
               }
-            };
-            remote.query(queryFun, {
-              reduce: false,
-              conflicts: true
-            }, function (_, res) {
-              res.rows.length.should.equal(1);
-              db.info(function (err, info) {
-                info.update_seq.should.equal(1);
-                info.doc_count.should.equal(1);
-                done();
+            }.toString()
+          }
+        }
+      };
+      remote.put(ddoc, function (err, localres) {
+        db.put(doc1, function (err, localres) {
+          remote.put(doc2, function (err, remoteres) {
+            db.replicate.to(dbs.remote, function (err, _) {
+              remote.query('conflicts/conflicts', {
+                reduce: false,
+                conflicts: true
+              }, function (_, res) {
+                res.rows.length.should.equal(1);
+                db.info(function (err, info) {
+                  verifyInfo(info, {
+                    update_seq: 1,
+                    doc_count: 1
+                  });
+                  done();
+                });
               });
             });
           });
@@ -729,8 +1198,10 @@ adapters.forEach(function (adapters) {
             return;
           }
           db.info(function (err, info) {
-            info.update_seq.should.equal(4);
-            info.doc_count.should.equal(4);
+            verifyInfo(info, {
+              update_seq: 4,
+              doc_count: 4
+            });
             done();
           });
         };
@@ -767,8 +1238,10 @@ adapters.forEach(function (adapters) {
             return;
           }
           db.info(function (err, info) {
-            info.update_seq.should.equal(4);
-            info.doc_count.should.equal(4);
+            verifyInfo(info, {
+              update_seq: 4,
+              doc_count: 4
+            });
             done();
           });
         };
@@ -819,8 +1292,10 @@ adapters.forEach(function (adapters) {
             complete: function (err, reason) {
               count.should.equal(4);
               db.info(function (err, info) {
-                info.update_seq.should.equal(4);
-                info.doc_count.should.equal(4);
+                verifyInfo(info, {
+                  update_seq: 4,
+                  doc_count: 4
+                });
                 done();
               });
             },
@@ -872,8 +1347,10 @@ adapters.forEach(function (adapters) {
               if (err) { done(err); }
               docs.rows.length.should.equal(2);
               db.info(function (err, info) {
-                info.update_seq.should.equal(2);
-                info.doc_count.should.equal(2);
+                verifyInfo(info, {
+                  update_seq: 2,
+                  doc_count: 2
+                });
                 done();
               });
             });
@@ -902,8 +1379,10 @@ adapters.forEach(function (adapters) {
             db.replicate.from(remote, {}, function (err, response) {
               response.docs_written.should.equal(3);
               db.info(function (err, info) {
-                info.update_seq.should.equal(5);
-                info.doc_count.should.equal(5);
+                verifyInfo(info, {
+                  update_seq: 5,
+                  doc_count: 5
+                });
                 done();
               });
             });
@@ -926,8 +1405,10 @@ adapters.forEach(function (adapters) {
         }, function (err, response) {
           response.docs_written.should.equal(2);
           db.info(function (err, info) {
-            info.update_seq.should.equal(2);
-            info.doc_count.should.equal(2);
+            verifyInfo(info, {
+              update_seq: 2,
+              doc_count: 2
+            });
             done();
           });
         });
@@ -937,32 +1418,41 @@ adapters.forEach(function (adapters) {
     it('Replication since', function (done) {
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
-      var thedocs = [
+      var docs1 = [
         {_id: '1', integer: 1, string: '1'},
         {_id: '2', integer: 2, string: '2'},
-        {_id: '3', integer: 3, string: '3'},
-        {_id: '4', integer: 4, string: '4'},
-        {_id: '5', integer: 5, string: '5'}
+        {_id: '3', integer: 3, string: '3'}
       ];
-      remote.bulkDocs({ docs: thedocs }, function (err, info) {
-        db.replicate.from(remote, {
-          since: 3,
-          complete: function (err, result) {
-            should.not.exist(err);
-            result.docs_written.should.equal(2);
+      remote.bulkDocs({ docs: docs1 }, function (err, info) {
+        remote.info(function (err, info) {
+          var update_seq = info.update_seq;
+          var docs2 = [
+            {_id: '4', integer: 4, string: '4'},
+            {_id: '5', integer: 5, string: '5'}
+          ];
+          remote.bulkDocs({ docs: docs2 }, function (err, info) {
             db.replicate.from(remote, {
-              since: 0,
+              since: update_seq,
               complete: function (err, result) {
                 should.not.exist(err);
-                result.docs_written.should.equal(3);
-                db.info(function (err, info) {
-                  info.update_seq.should.equal(5);
-                  info.doc_count.should.equal(5);
-                  done();
+                result.docs_written.should.equal(2);
+                db.replicate.from(remote, {
+                  since: 0,
+                  complete: function (err, result) {
+                    should.not.exist(err);
+                    result.docs_written.should.equal(3);
+                    db.info(function (err, info) {
+                      verifyInfo(info, {
+                        update_seq: 5,
+                        doc_count: 5
+                      });
+                      done();
+                    });
+                  }
                 });
               }
             });
-          }
+          });
         });
       });
     });
@@ -988,8 +1478,10 @@ adapters.forEach(function (adapters) {
             }, function (err, response) {
               response.docs_written.should.equal(1);
               db.info(function (err, info) {
-                info.update_seq.should.equal(3);
-                info.doc_count.should.equal(3);
+                verifyInfo(info, {
+                  update_seq: 3,
+                  doc_count: 3
+                });
                 done();
               });
             });
@@ -1021,8 +1513,10 @@ adapters.forEach(function (adapters) {
               if (err) { done(err); }
               docs.rows.length.should.equal(3);
               db.info(function (err, info) {
-                info.update_seq.should.equal(3);
-                info.doc_count.should.equal(3);
+                verifyInfo(info, {
+                  update_seq: 3,
+                  doc_count: 3
+                });
                 done();
               });
             });
@@ -1049,8 +1543,10 @@ adapters.forEach(function (adapters) {
           db.allDocs(function (err, res) {
             res.total_rows.should.equal(4);
             db.info(function (err, info) {
-              info.update_seq.should.equal(5);
-              info.doc_count.should.equal(4);
+              verifyInfo(info, {
+                update_seq: 5,
+                doc_count: 4
+              });
               done();
             });
           });
@@ -1098,8 +1594,10 @@ adapters.forEach(function (adapters) {
       }).then(function (res) {
         res.total_rows.should.equal(2);
         db.info(function (err, info) {
-          info.update_seq.should.equal(4);
-          info.doc_count.should.equal(2);
+          verifyInfo(info, {
+            update_seq: 4,
+            doc_count: 2
+          });
           done();
         });
       }).catch(function (err) {
@@ -1115,8 +1613,10 @@ adapters.forEach(function (adapters) {
         changes++;
         if (changes === 3) {
           db.info(function (err, info) {
-            info.update_seq.should.equal(3);
-            info.doc_count.should.equal(3);
+            verifyInfo(info, {
+              update_seq: 3,
+              doc_count: 3
+            });
             done();
           });
         }
@@ -1150,8 +1650,10 @@ adapters.forEach(function (adapters) {
                         localdoc._rev.should.equal(winningRev);
                         remotedoc._rev.should.equal(winningRev);
                         db.info(function (err, info) {
-                          info.update_seq.should.equal(3);
-                          info.doc_count.should.equal(1);
+                          verifyInfo(info, {
+                            update_seq: 3,
+                            doc_count: 1
+                          });
                           done();
                         });
                       });
@@ -1268,7 +1770,9 @@ adapters.forEach(function (adapters) {
       }).then(function (res) {
         res.rows.should.have.length(0, 'deleted locally');
       }).then(function () {
-        return waitForChange(remote, function (c) { return c.seq === 2; });
+        return waitForChange(remote, function (c) {
+          return c.id === doc._id && c.deleted;
+        });
       }).then(function () {
         return remote.allDocs();
       }).then(function (res) {
@@ -1374,7 +1878,9 @@ adapters.forEach(function (adapters) {
           result.docs_written.should.equal(3);
           result.docs_read.should.equal(3);
           db.info(function (err, info) {
-            info.update_seq.should.be.above(0);
+            if (!testUtils.isCouchMaster()) {
+              info.update_seq.should.be.above(0);
+            }
             info.doc_count.should.equal(1);
             done();
           });
@@ -1402,8 +1908,10 @@ adapters.forEach(function (adapters) {
           db.allDocs(function (err, res) {
             res.total_rows.should.equal(num);
             db.info(function (err, info) {
-              info.update_seq.should.equal(30);
-              info.doc_count.should.equal(30);
+              verifyInfo(info, {
+                update_seq: 30,
+                doc_count: 30
+              });
               done();
             });
           });
@@ -1453,8 +1961,10 @@ adapters.forEach(function (adapters) {
           doc_count.should.equal(result.docs_read);
           remote.changes = changes;
           db.info(function (err, info) {
-            info.update_seq.should.equal(3);
-            info.doc_count.should.equal(3);
+            verifyInfo(info, {
+              update_seq: 3,
+              doc_count: 3
+            });
             done();
           });
         });
@@ -1546,8 +2056,10 @@ adapters.forEach(function (adapters) {
         }, function (err, result) {
           result.docs_written.should.equal(docList.length);
           db.info(function (err, info) {
-            info.update_seq.should.equal(3);
-            info.doc_count.should.equal(3);
+            verifyInfo(info, {
+              update_seq: 3,
+              doc_count: 3
+            });
             done();
           });
         });
@@ -1655,8 +2167,10 @@ adapters.forEach(function (adapters) {
             function check_docs(id, exists) {
               if (!id) {
                 db.info(function (err, info) {
-                  info.update_seq.should.equal(6);
-                  info.doc_count.should.equal(6);
+                  verifyInfo(info, {
+                    update_seq: 6,
+                    doc_count: 6
+                  });
                   done();
                 });
                 return;
@@ -1832,8 +2346,10 @@ adapters.forEach(function (adapters) {
             function check_docs(id, exists) {
               if (!id) {
                 db.info(function (err, info) {
-                  info.update_seq.should.equal(6);
-                  info.doc_count.should.equal(6);
+                  verifyInfo(info, {
+                    update_seq: 6,
+                    doc_count: 6
+                  });
                   done();
                 });
                 return;
@@ -1926,8 +2442,10 @@ adapters.forEach(function (adapters) {
           complete: function (err, result) {
             should.exist(err);
             db.info(function (err, info) {
-              info.update_seq.should.equal(2);
-              info.doc_count.should.equal(2);
+              verifyInfo(info, {
+                update_seq: 2,
+                doc_count: 2
+              });
               done();
             });
           }
@@ -1943,8 +2461,10 @@ adapters.forEach(function (adapters) {
         should.exist(result);
         result.docs_written.should.equal(0);
         db.info(function (err, info) {
-          info.update_seq.should.equal(0);
-          info.doc_count.should.equal(0);
+          verifyInfo(info, {
+            update_seq: 0,
+            doc_count: 0
+          });
           done();
         });
       });
@@ -1988,6 +2508,7 @@ adapters.forEach(function (adapters) {
       var remote = new PouchDB(dbs.remote);
       db.bulkDocs({docs: docs}, {new_edits: false}, function (err, _) {
         var bulkDocs = remote.bulkDocs;
+        var bulkDocsCallCount = 0;
         remote.bulkDocs = function (content, opts, callback) {
           return new PouchDB.utils.Promise(function (fulfill, reject) {
             if (typeof callback !== 'function') {
@@ -1999,12 +2520,17 @@ adapters.forEach(function (adapters) {
                 }
               };
             }
-            var ids = content.docs.map(function (doc) { return doc._id; });
-            if (ids.indexOf('a') >= 0) {
-              callback(null, [{ok: true, id: 'a', rev: '1-a'}]);
-            } else if (ids.indexOf('b') >= 0) {
+
+            // mock a successful write for the first
+            // document and a failed write for the second
+            var doc = content.docs[0];
+            if (bulkDocsCallCount === 0) {
+              bulkDocsCallCount++;
+              callback(null, [{ok: true, id: doc._id, rev: doc._rev}]);
+            } else if (bulkDocsCallCount === 1) {
+              bulkDocsCallCount++;
               callback(null, [{
-                id: 'b',
+                id: doc._id,
                 error: 'internal server error',
                 reason: 'test document write error'
               }]);
@@ -2030,8 +2556,10 @@ adapters.forEach(function (adapters) {
             result.doc_write_failures.should
               .equal(0, 'second replication, doc_write_failures');
             db.info(function (err, info) {
-              info.update_seq.should.equal(2);
-              info.doc_count.should.equal(2);
+              verifyInfo(info, {
+                update_seq: 2,
+                doc_count: 2
+              });
               done();
             });
           });
@@ -2066,7 +2594,6 @@ adapters.forEach(function (adapters) {
               .equal(0, 'second replication, doc_write_failures');
             result.docs_written.should
               .equal(2, 'second replication, docs_written');
-            result.last_seq.should.equal(2, 'second replication, last_seq');
             done();
           });
         });
@@ -2168,8 +2695,10 @@ adapters.forEach(function (adapters) {
             }, function (err, result) {
               result.docs_written.should.equal(0);
               db.info(function (err, info) {
-                info.update_seq.should.equal(5);
-                info.doc_count.should.equal(5);
+                verifyInfo(info, {
+                  update_seq: 5,
+                  doc_count: 5
+                });
                 done();
               });
             });
@@ -2263,8 +2792,10 @@ adapters.forEach(function (adapters) {
                 workflow(name, remote, x);
               } else {
                 db.info(function (err, info) {
-                  info.update_seq.should.equal(4);
-                  info.doc_count.should.equal(4);
+                  verifyInfo(info, {
+                    update_seq: 4,
+                    doc_count: 4
+                  });
                   done();
                 });
               }
@@ -2287,8 +2818,10 @@ adapters.forEach(function (adapters) {
             result.rows[0].id.should.equal('a');
             result.rows[1].id.should.equal('b');
             db.info(function (err, info) {
-              info.update_seq.should.equal(2);
-              info.doc_count.should.equal(2);
+              verifyInfo(info, {
+                update_seq: 2,
+                doc_count: 2
+              });
               done();
             });
           });
@@ -2306,8 +2839,10 @@ adapters.forEach(function (adapters) {
             db.replicate.to(dbs.remote, function (err, result) {
               result.docs_written.should.equal(docs.length);
               db.info(function (err, info) {
-                info.update_seq.should.equal(2);
-                info.doc_count.should.equal(2);
+                verifyInfo(info, {
+                  update_seq: 2,
+                  doc_count: 2
+                });
                 done();
               });
             });
@@ -2338,8 +2873,10 @@ adapters.forEach(function (adapters) {
         return src.replicate.to(target);
       }).then(function () {
         target.info(function (err, info) {
-          info.update_seq.should.equal(3);
-          info.doc_count.should.equal(3);
+          verifyInfo(info, {
+            update_seq: 3,
+            doc_count: 3
+          });
           done();
         });
       }, function (a) {
@@ -2383,6 +2920,11 @@ adapters.forEach(function (adapters) {
     });
 
     it('issue #2393 update_seq after new_edits + replication', function (done) {
+      // the assertions below do not hold in a clustered CouchDB
+      if (testUtils.isCouchMaster()) {
+        return done();
+      }
+
       var docs = [{
         '_id': 'foo',
         '_rev': '1-x',
@@ -2450,63 +2992,69 @@ adapters.forEach(function (adapters) {
     });
 
     it('retry stuff', function (done) {
+
       var remote = new PouchDB(dbs.remote);
       var Promise = PouchDB.utils.Promise;
       var allDocs = remote.allDocs;
+
+      // Reject attempting to write 'foo' 3 times, then let it succeed
       var i = 0;
-      var started = 0;
       remote.allDocs = function (opts) {
         if (opts.keys[0] === 'foo') {
-          i++;
-          if (i !== 3) {
+          if (++i !== 3) {
             return Promise.reject(new Error('flunking you'));
           }
         }
         return allDocs.apply(remote, arguments);
       };
+
       var db = new PouchDB(dbs.name);
       var rep = db.replicate.from(remote, {
         live: true,
         retry: true
       });
-      rep.once('syncStopped', function () {
-        i.should.equal(1, 'sync stopped event');
-        started.should.equal(1, 'sync stopped event');
-        started++;
-      });
-      rep.on('syncRestarted', function () {
-        i.should.equal(3, 'sync restarted event');
-        started.should.equal(2, 'sync stopped event');
-        started++;
-      });
-      rep.on('syncStarted', function () {
-        i.should.equal(0, 'sync started event');
-        started.should.equal(0, 'sync started event');
-        started++;
-      });
-      rep.catch(done);
-      var called = 3;
-      rep.on('change', function () {
-        if ((--called) === 2) {
-          remote.put({}, 'foo').then(function () {
+
+      var paused = 0;
+      rep.on('paused', function (e) {
+        ++paused;
+        // The first paused event is the replication up to date
+        // and waiting on changes (no error)
+        if (paused === 1) {
+          (typeof e).should.equal('undefined');
+          return remote.put({}, 'foo').then(function () {
             return remote.put({}, 'bar');
           });
-        } else if (!called) {
-          rep.cancel();
-          remote.put({}, 'foo2').then(function () {
-            return remote.put({}, 'bar2');
-          }).then(function () {
-            setTimeout(function () {
-              started.should.equal(3, 'everything was emitted');
-              done();
-            }, 500);
-          });
-        } else if (called < 0) {
-          done(new Error('called too many times'));
+        }
+        // Second paused event is due to failed writes, should
+        // have an error
+        if (paused === 2) {
+          e.should.exist();
         }
       });
+
+      var active = 0;
+      rep.on('active', function () {
+        ++active;
+      });
+
+      rep.on('complete', function() {
+        active.should.equal(2);
+        paused.should.equal(2);
+        done();
+      });
+
+      rep.catch(done);
+
+      var numChanges = 0;
+      rep.on('change', function () {
+        if (++numChanges === 3) {
+          rep.cancel();
+        }
+      });
+
       remote.put({}, 'hazaa');
     });
+
 
     it('#2970 should replicate remote database w/ deleted conflicted revs',
         function (done) {
@@ -2517,7 +3065,7 @@ adapters.forEach(function (adapters) {
       function uuid() {
         return PouchDB.utils.uuid(32, 16).toLowerCase();
       }
-      
+
       // create a bunch of rando, good revisions
       var numRevs = 5;
       var uuids = [];
@@ -2715,6 +3263,205 @@ adapters.forEach(function (adapters) {
       });
     });
 
+    // Errors from validate_doc_update should have the message
+    // defined in PourchDB.Errors instead of the thrown value.
+    it('#3171 Forbidden validate_doc_update error message',
+        function (done) {
+      testUtils.isCouchDB(function (isCouchDB) {
+        if (adapters[1] !== 'http' || !isCouchDB) {
+          return done();
+        }
+
+        var ddoc = {
+          "_id": "_design/validate",
+          "validate_doc_update": function (newDoc) {
+            if (newDoc.foo === 'object') {
+              throw { forbidden: { foo: 'is object' } };
+            } else if (newDoc.foo === 'string') {
+              throw { forbidden: 'Document foo is string' };
+            }
+          }.toString()
+        };
+
+        var remote = new PouchDB(dbs.remote);
+        var db = new PouchDB(dbs.name);
+
+        return remote.put(ddoc).then(function () {
+          var docs = [{foo: 'string'}, {}, {foo: 'object'}];
+          return db.bulkDocs({docs: docs});
+        }).then(function () {
+          return db.replicate.to(dbs.remote);
+        }).then(function (res) {
+          res.ok.should.equal(true);
+          res.docs_read.should.equal(3);
+          res.docs_written.should.equal(1);
+          res.doc_write_failures.should.equal(2);
+          res.errors.should.have.length(2);
+          res.errors.forEach(function (e) {
+            e.status.should.equal(PouchDB.Errors.FORBIDDEN.status,
+                                  'correct error status returned');
+            e.name.should.equal(PouchDB.Errors.FORBIDDEN.name,
+                                'correct error name returned');
+            e.message.should.equal(PouchDB.Errors.FORBIDDEN.message,
+                                   'correct error message returned');
+          });
+
+          return remote.allDocs({limit: 0});
+        }).then(function (res) {
+          res.total_rows.should.equal(2); // 1 plus the validate doc
+          return db.allDocs({limit: 0});
+        }).then(function (res) {
+          res.total_rows.should.equal(3); // 1 valid and 2 invalid
+        }).then(done);
+      });
+    });
+
+    it('#3171 Unauthorized validate_doc_update error message',
+        function (done) {
+      testUtils.isCouchDB(function (isCouchDB) {
+        if (adapters[1] !== 'http' || !isCouchDB) {
+          return done();
+        }
+
+        var ddoc = {
+          "_id": "_design/validate",
+          "validate_doc_update": function (newDoc) {
+            if (newDoc.foo === 'object') {
+              throw { unauthorized: { foo: 'is object' } };
+            } else if (newDoc.foo === 'string') {
+              throw { unauthorized: 'Document foo is string' };
+            }
+          }.toString()
+        };
+
+        var remote = new PouchDB(dbs.remote);
+        var db = new PouchDB(dbs.name);
+
+        return remote.put(ddoc).then(function () {
+          var docs = [{foo: 'string'}, {}, {foo: 'object'}];
+          return db.bulkDocs({docs: docs});
+        }).then(function () {
+          return db.replicate.to(dbs.remote);
+        }).then(function (res) {
+          res.ok.should.equal(true);
+          res.docs_read.should.equal(3);
+          res.docs_written.should.equal(1);
+          res.doc_write_failures.should.equal(2);
+          res.errors.should.have.length(2);
+          res.errors.forEach(function (e) {
+            e.status.should.equal(PouchDB.Errors.UNAUTHORIZED.status,
+                                  'correct error status returned');
+            e.name.should.equal(PouchDB.Errors.UNAUTHORIZED.name,
+                                'correct error name returned');
+            e.message.should.equal(PouchDB.Errors.UNAUTHORIZED.message,
+                                   'correct error message returned');
+          });
+
+          return remote.allDocs({limit: 0});
+        }).then(function (res) {
+          res.total_rows.should.equal(2); // 1 plus the validate doc
+          return db.allDocs({limit: 0});
+        }).then(function (res) {
+          res.total_rows.should.equal(3); // 1 valid and 2 invalid
+        }).then(done);
+      });
+    });
+
+    it('#3070 Doc IDs with validate_doc_update errors',
+        function (done) {
+      testUtils.isCouchDB(function (isCouchDB) {
+        if (adapters[1] !== 'http' || !isCouchDB) {
+          return done();
+        }
+
+        var ddoc = {
+          "_id": "_design/validate",
+          "validate_doc_update": function (newDoc) {
+            if (newDoc.foo) {
+              throw { unauthorized: 'go away, no picture' };
+            }
+          }.toString()
+        };
+
+        var remote = new PouchDB(dbs.remote);
+        var db = new PouchDB(dbs.name);
+
+        return remote.put(ddoc).then(function () {
+          var docs = [{foo: 'string'}, {}, {foo: 'object'}];
+          return db.bulkDocs({docs: docs});
+        }).then(function () {
+          return db.replicate.to(dbs.remote);
+        }).then(function (res) {
+          var ids = [];
+          res.ok.should.equal(true);
+          res.docs_read.should.equal(3);
+          res.docs_written.should.equal(1);
+          res.doc_write_failures.should.equal(2);
+          res.errors.should.have.length(2);
+          res.errors.forEach(function (e) {
+            should.exist(e.id, 'get doc id with error message');
+            ids.push(e.id);
+          });
+          ids = ids.filter(function (id) {
+            return ids.indexOf(id) === ids.lastIndexOf(id);
+          });
+          ids.length.should.equal(res.errors.length,
+                                  'doc ids are unique');
+          return remote.allDocs({limit: 0});
+        }).then(function (res) {
+          res.total_rows.should.equal(2); // 1 plus the validate doc
+          return db.allDocs({limit: 0});
+        }).then(function (res) {
+          res.total_rows.should.equal(3); // 1 valid and 2 invalid
+        }).then(done);
+      });
+    });
+
+    it('#3270 triggers "denied" events', function (done) {
+      testUtils.isCouchDB(function (isCouchDB) {
+        if (/*adapters[1] !== 'http' || */!isCouchDB) {
+          return done();
+        }
+        if (adapters[0] !== 'local' || adapters[1] !== 'http') {
+          return done();
+        }
+
+        var deniedErrors = [];
+        var ddoc = {
+          "_id": "_design/validate",
+          "validate_doc_update": function (newDoc) {
+            if (newDoc.foo) {
+              throw { unauthorized: 'go away, no picture' };
+            }
+          }.toString()
+        };
+
+        var remote = new PouchDB(dbs.remote);
+        var db = new PouchDB(dbs.name);
+
+        return remote.put(ddoc).then(function () {
+          var docs = [
+            {_id: 'foo1', foo: 'string'},
+            {_id: 'nofoo'},
+            {_id: 'foo2', foo: 'object'}
+          ];
+          return db.bulkDocs({docs: docs});
+        }).then(function () {
+          var replication = db.replicate.to(dbs.remote);
+          replication.on('denied', function(error) {
+            deniedErrors.push(error);
+          });
+          return replication;
+        }).then(function (res) {
+          deniedErrors.length.should.equal(2);
+          deniedErrors[0].id.should.equal('foo1');
+          deniedErrors[0].name.should.equal('unauthorized');
+          deniedErrors[1].id.should.equal('foo2');
+          deniedErrors[1].name.should.equal('unauthorized');
+          done();
+        }).catch(done);
+      });
+    });
   });
 });
 

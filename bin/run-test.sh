@@ -25,9 +25,13 @@ if [[ ! -z $SERVER ]]; then
     if [[ "$TRAVIS_REPO_SLUG" == "pouchdb/pouchdb" ]]; then
       ./bin/run-couch-master-on-travis.sh
     fi
-    export COUCH_HOST='http://127.0.0.1:15986'
+    export COUCH_HOST='http://127.0.0.1:15984'
   elif [ "$SERVER" == "pouchdb-express-router" ]; then
     node ./tests/misc/pouchdb-express-router.js &
+    sleep 5
+    export COUCH_HOST='http://127.0.0.1:3000'
+  elif [ "$SERVER" == "express-pouchdb-minimum" ]; then
+    node ./tests/misc/express-pouchdb-minimum-for-pouchdb.js &
     sleep 5
     export COUCH_HOST='http://127.0.0.1:3000'
   else

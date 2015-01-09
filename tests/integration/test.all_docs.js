@@ -52,15 +52,19 @@ adapters.forEach(function (adapter) {
               var ids = ['0', '3', '1', '2'];
               db.changes({
                 complete: function (err, changes) {
+                  // order of changes is not guaranteed in a 
+                  // clustered changes feed
                   changes.results.forEach(function (row, i) {
-                    row.id.should.equal(ids[i], 'seq order');
+                    ids.should.include(row.id, 'seq order');
                   });
                   db.changes({
                     descending: true,
                     complete: function (err, changes) {
+                      // again, order is not guaranteed so 
+                      // unsure if this is a useful test
                       ids = ['2', '1', '3', '0'];
                       changes.results.forEach(function (row, i) {
-                        row.id.should.equal(ids[i], 'descending=true');
+                        ids.should.include(row.id, 'descending=true');
                       });
                       done();
                     }
@@ -97,12 +101,19 @@ adapters.forEach(function (adapter) {
                 keys: keys,
                 startkey: 'a'
               }, function (err, result) {
-                should.exist(err);
+                
+                // blocked on COUCHDB-2523
+                if (!testUtils.isCouchMaster()) {
+                  should.exist(err);
+                }
                 db.allDocs({
                   keys: keys,
                   endkey: 'a'
                 }, function (err, result) {
-                  should.exist(err);
+                  // blocked on COUCHDB-2523
+                  if (!testUtils.isCouchMaster()) {
+                    should.exist(err);
+                  }
                   db.allDocs({ keys: [] }, function (err, result) {
                     result.rows.should.have.length(0);
                     db.get('2', function (err, doc) {
@@ -127,18 +138,27 @@ adapters.forEach(function (adapter) {
 
     it('Testing deleting in changes', function (done) {
       var db = new PouchDB(dbs.name);
-      testUtils.writeDocs(db, JSON.parse(JSON.stringify(origDocs)),
-        function () {
-        db.get('1', function (err, doc) {
-          db.remove(doc, function (err, deleted) {
-            should.exist(deleted.ok);
-            db.changes({
-              complete: function (err, changes) {
-                changes.results.should.have.length(4);
-                changes.results[3].id.should.equal('1');
-                should.exist(changes.results[3].deleted);
-                done();
-              }
+
+      db.info(function (err, info) {
+        var update_seq = info.update_seq;
+        
+        testUtils.writeDocs(db, JSON.parse(JSON.stringify(origDocs)),
+          function () {
+          db.get('1', function (err, doc) {
+            db.remove(doc, function (err, deleted) {
+              should.exist(deleted.ok);
+
+              db.changes({
+                since: update_seq,
+                complete: function (err, changes) {
+                  var deleted_ids = changes.results.map(function (c) {
+                    if (c.deleted) { return c.id; }
+                  });
+                  deleted_ids.should.include('1');
+
+                  done();
+                }
+              });
             });
           });
         });
@@ -147,17 +167,24 @@ adapters.forEach(function (adapter) {
 
     it('Testing updating in changes', function (done) {
       var db = new PouchDB(dbs.name);
-      testUtils.writeDocs(db, JSON.parse(JSON.stringify(origDocs)),
-        function () {
-        db.get('3', function (err, doc) {
-          doc.updated = 'totally';
-          db.put(doc, function (err, doc) {
-            db.changes({
-              complete: function (err, changes) {
-                changes.results.should.have.length(4);
-                changes.results[3].id.should.equal('3');
-                done();
-              }
+
+      db.info(function (err, info) {
+        var update_seq = info.update_seq;
+        
+        testUtils.writeDocs(db, JSON.parse(JSON.stringify(origDocs)), 
+          function () {
+          db.get('3', function (err, doc) {
+            doc.updated = 'totally';
+            db.put(doc, function (err, doc) {
+              db.changes({
+                since: update_seq,
+                complete: function (err, changes) {
+                  var ids = changes.results.map(function (c) { return c.id; });
+                  ids.should.include('3');
+
+                  done();
+                }
+              });
             });
           });
         });
@@ -171,7 +198,12 @@ adapters.forEach(function (adapter) {
         db.changes({
           include_docs: true,
           complete: function (err, changes) {
-            changes.results[0].doc.a.should.equal(1);
+            changes.results.forEach(function (row, i) {
+              if (row.id === '0') {
+                row.doc.a.should.equal(1);
+              }
+            });
+            
             done();
           }
         });
@@ -202,16 +234,26 @@ adapters.forEach(function (adapter) {
                 conflicts: true,
                 style: 'all_docs',
                 complete: function (err, changes) {
-                  var result = changes.results[3];
-                  result.id.should.equal('3', 'changes are ordered');
+
+                  changes.results.map(function (x) { return x.id; }).sort()
+                    .should.deep.equal(['0', '1', '2', '3'],
+                      'all ids are in _changes');
+
+                  var result = changes.results.filter(function (row, i) {
+                    return row.id === '3';
+                  })[0];
+                  
                   result.changes.should.have
                     .length(3, 'correct number of changes');
                   result.doc._rev.should.equal(conflictDoc2._rev);
                   result.doc._id.should.equal('3', 'correct doc id');
                   winRev._rev.should.equal(result.doc._rev);
-                  result.doc._conflicts.should.be.instanceof(Array);
-                  result.doc._conflicts.should.have.length(2);
-                  conflictDoc1._rev.should.equal(result.doc._conflicts[0]);
+                  // blocked on COUCHDB-2518
+                  if (!testUtils.isCouchMaster()) {
+                    result.doc._conflicts.should.be.instanceof(Array);
+                    result.doc._conflicts.should.have.length(2);
+                    conflictDoc1._rev.should.equal(result.doc._conflicts[0]);
+                  }
                   db.allDocs({
                     include_docs: true,
                     conflicts: true
@@ -474,7 +516,10 @@ adapters.forEach(function (adapter) {
               '2'
             ]
           }, function (err) {
-            should.exist(err);
+            // blocked on COUCHDB-2523
+            if (!testUtils.isCouchMaster()) {
+              should.exist(err);
+            }
             db.allDocs({
               key: '1',
               startkey: '1'

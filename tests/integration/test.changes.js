@@ -9,6 +9,20 @@ adapters.forEach(function (adapter) {
 
     var dbs = {};
 
+    // if it exists, return the single element
+    // which has the specific id. Else retun null.
+    // useful for finding elements within a _changes feed
+    function findById(array, id) {
+      var result = array.filter(function (i) {
+        return i.id === id;
+      });
+
+      //
+      if (result.length === 1) {
+        return result[0];
+      }
+    }
+
     beforeEach(function (done) {
       dbs.name = testUtils.adapterUrl(adapter, 'testdb');
       dbs.remote = testUtils.adapterUrl(adapter, 'test_repl_remote');
@@ -77,7 +91,7 @@ adapters.forEach(function (adapter) {
     });
 
     it('Changes Since Old Style', function (done) {
-      var docs = [
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
         {_id: '2', integer: 2},
@@ -89,26 +103,36 @@ adapters.forEach(function (adapter) {
         {_id: '8', integer: 9},
         {_id: '9', integer: 9},
         {_id: '10', integer: 10},
-        {_id: '11', integer: 11},
-        {_id: '12', integer: 12},
-        {_id: '13', integer: 13}
+        {_id: '11', integer: 11}
       ];
       var db = new PouchDB(dbs.name);
-      db.bulkDocs({ docs: docs }, function (err, info) {
-        var promise = db.changes({
-          since: 12,
-          complete: function (err, results) {
-            results.results.length.should.equal(2);
-            done();
-          }
+
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          var docs2 = [
+            {_id: '12', integer: 12},
+            {_id: '13', integer: 13}
+          ];
+
+          db.bulkDocs({ docs: docs2 }, function (err, info) {
+            var promise = db.changes({
+              since: update_seq,
+              complete: function (err, results) {
+                results.results.length.should.be.at.least(2);
+                done();
+              }
+            });
+            should.exist(promise);
+            promise.cancel.should.be.a('function');
+          });
         });
-        should.exist(promise);
-        promise.cancel.should.be.a('function');
       });
     });
 
     it('Changes Since New Style', function (done) {
-      var docs = [
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
         {_id: '2', integer: 2},
@@ -120,97 +144,147 @@ adapters.forEach(function (adapter) {
         {_id: '8', integer: 9},
         {_id: '9', integer: 9},
         {_id: '10', integer: 10},
-        {_id: '11', integer: 11},
-        {_id: '12', integer: 12},
-        {_id: '13', integer: 13}
+        {_id: '11', integer: 11}
       ];
       var db = new PouchDB(dbs.name);
-      db.bulkDocs({ docs: docs }, function (err, info) {
-        var promise = db.changes({
-          since: 12
-        }).on('complete', function (results) {
-          results.results.length.should.equal(2);
-          done();
+
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          var docs2 = [
+            {_id: '12', integer: 12},
+            {_id: '13', integer: 13}
+          ];
+
+          db.bulkDocs({ docs: docs2 }, function (err, info) {
+            var promise = db.changes({
+              since: update_seq
+            }).on('complete', function (results) {
+              results.results.length.should.be.at.least(2);
+              done();
+            });
+            should.exist(promise);
+            promise.cancel.should.be.a('function');
+          });
         });
-        should.exist(promise);
-        promise.cancel.should.be.a('function');
       });
     });
 
-    it('Changes Since and limit Old Style limit 1', function (done) {
-      var docs = [
+    it('Changes Since and limit Old Style liimt 1', function (done) {
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
-        {_id: '2', integer: 2},
-        {_id: '3', integer: 3},
+        {_id: '2', integer: 2}
       ];
       var db = new PouchDB(dbs.name);
-      db.bulkDocs({ docs: docs }, function (err, info) {
-        db.changes({
-          since: 2,
-          limit: 1,
-          complete: function (err, results) {
-            results.results.length.should.equal(1);
-            done();
-          }
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          var docs2 = [
+            {_id: '3', integer: 3},
+            {_id: '4', integer: 4}
+          ];
+
+          db.bulkDocs({ docs: docs2 }, function (err, info) {
+            db.changes({
+              since: update_seq,
+              limit: 1,
+              complete: function (err, results) {
+                results.results.length.should.equal(1);
+                done();
+              }
+            });
+          });
         });
       });
     });
 
     it('Changes Since and limit New Style limit 1', function (done) {
-      var docs = [
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
-        {_id: '2', integer: 2},
-        {_id: '3', integer: 3},
+        {_id: '2', integer: 2}
       ];
       var db = new PouchDB(dbs.name);
-      db.bulkDocs({ docs: docs }, function (err, info) {
-        db.changes({
-          since: 2,
-          limit: 1
-        }).on('complete', function (results) {
-          results.results.length.should.equal(1);
-          done();
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          var docs2 = [
+            {_id: '3', integer: 3},
+            {_id: '4', integer: 4}
+          ];
+
+          db.bulkDocs({ docs: docs2 }, function (err, info) {
+            db.changes({
+              since: update_seq,
+              limit: 1
+            }).on('complete', function (results) {
+              results.results.length.should.equal(1);
+              done();
+            });
+          });
         });
       });
     });
 
     it('Changes Since and limit Old Style limit 0', function (done) {
-      var docs = [
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
-        {_id: '2', integer: 2},
-        {_id: '3', integer: 3},
+        {_id: '2', integer: 2}
       ];
       var db = new PouchDB(dbs.name);
-      db.bulkDocs({ docs: docs }, function (err, info) {
-        db.changes({
-          since: 2,
-          limit: 0,
-          complete: function (err, results) {
-            results.results.length.should.equal(1);
-            done();
-          }
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          var docs2 = [
+            {_id: '3', integer: 3},
+            {_id: '4', integer: 4}
+          ];
+
+          db.bulkDocs({ docs: docs2 }, function (err, info) {
+            db.changes({
+              since: update_seq,
+              limit: 0,
+              complete: function (err, results) {
+                results.results.length.should.equal(1);
+                done();
+              }
+            });
+          });
         });
       });
     });
 
     it('Changes Since and limit New Style limit 0', function (done) {
-      var docs = [
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
-        {_id: '2', integer: 2},
-        {_id: '3', integer: 3},
+        {_id: '2', integer: 2}
       ];
       var db = new PouchDB(dbs.name);
-      db.bulkDocs({ docs: docs }, function (err, info) {
-        db.changes({
-          since: 2,
-          limit: 0
-        }).on('complete', function (results) {
-          results.results.length.should.equal(1);
-          done();
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          var docs2 = [
+            {_id: '3', integer: 3},
+            {_id: '4', integer: 4}
+          ];
+
+          db.bulkDocs({ docs: docs2 }, function (err, info) {
+            db.changes({
+              since: update_seq,
+              limit: 0
+            }).on('complete', function (results) {
+              results.results.length.should.equal(1);
+              done();
+            });
+          });
         });
       });
     });
@@ -220,7 +294,7 @@ adapters.forEach(function (adapter) {
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
         {_id: '2', integer: 2},
-        {_id: '3', integer: 3},
+        {_id: '3', integer: 3}
       ];
       var docs2 = [
         {_id: '2', integer: 11},
@@ -232,24 +306,38 @@ adapters.forEach(function (adapter) {
       testUtils.writeDocs(db, docs1, function (err, info) {
         docs2[0]._rev = info[2].rev;
         docs2[1]._rev = info[3].rev;
-        db.put(docs2[0], function (err, info) {
-          db.put(docs2[1], function (err, info) {
-            db.changes({
-              limit: 2,
-              since: 2,
-              include_docs: true,
-              complete: function (err, results) {
-                results.last_seq.should.equal(6);
-                results = results.results;
-                results.length.should.equal(2);
-                results[0].id.should.equal('2');
-                results[0].seq.should.equal(5);
-                results[0].doc.integer.should.equal(11);
-                results[1].id.should.equal('3');
-                results[1].seq.should.equal(6);
-                results[1].doc.integer.should.equal(12);
-                done();
-              }
+
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          db.put(docs2[0], function (err, info) {
+            docs2[0]._rev = info.rev;
+            db.put(docs2[1], function (err, info) {
+              docs2[1]._rev = info.rev;
+              db.changes({
+                limit: 2,
+                since: update_seq,
+                include_docs: true,
+                complete: function (err, results) {
+                  results = results.results;
+                  results.length.should.equal(2);
+
+                  // order is not guaranteed
+                  var first = results[0];
+                  var second = results[1];
+                  if (first.id === '3') {
+                    second = first;
+                    first = results[1];
+                  }
+                  first.id.should.equal('2');
+                  first.doc.integer.should.equal(docs2[0].integer);
+                  first.doc._rev.should.equal(docs2[0]._rev);
+                  second.id.should.equal('3');
+                  second.doc.integer.should.equal(docs2[1].integer);
+                  second.doc._rev.should.equal(docs2[1]._rev);
+                  done();
+                }
+              });
             });
           });
         });
@@ -261,7 +349,7 @@ adapters.forEach(function (adapter) {
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
         {_id: '2', integer: 2},
-        {_id: '3', integer: 3},
+        {_id: '3', integer: 3}
       ];
       var docs2 = [
         {_id: '2', integer: 11},
@@ -273,23 +361,37 @@ adapters.forEach(function (adapter) {
       testUtils.writeDocs(db, docs1, function (err, info) {
         docs2[0]._rev = info[2].rev;
         docs2[1]._rev = info[3].rev;
-        db.put(docs2[0], function (err, info) {
-          db.put(docs2[1], function (err, info) {
-            db.changes({
-              limit: 2,
-              since: 2,
-              include_docs: true
-            }).on('complete', function (results) {
-              results.last_seq.should.equal(6);
-              results = results.results;
-              results.length.should.equal(2);
-              results[0].id.should.equal('2');
-              results[0].seq.should.equal(5);
-              results[0].doc.integer.should.equal(11);
-              results[1].id.should.equal('3');
-              results[1].seq.should.equal(6);
-              results[1].doc.integer.should.equal(12);
-              done();
+
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          db.put(docs2[0], function (err, info) {
+            docs2[0]._rev = info.rev;
+            db.put(docs2[1], function (err, info) {
+              docs2[1]._rev = info.rev;
+              db.changes({
+                limit: 2,
+                since: update_seq,
+                include_docs: true
+              }).on('complete', function (results) {
+                results = results.results;
+                results.length.should.equal(2);
+
+                // order is not guaranteed
+                var first = results[0];
+                var second = results[1];
+                if (first.id === '3') {
+                  second = first;
+                  first = results[1];
+                }
+                first.id.should.equal('2');
+                first.doc.integer.should.equal(docs2[0].integer);
+                first.doc._rev.should.equal(docs2[0]._rev);
+                second.id.should.equal('3');
+                second.doc.integer.should.equal(docs2[1].integer);
+                second.doc._rev.should.equal(docs2[1]._rev);
+                done();
+              });
             });
           });
         });
@@ -312,8 +414,12 @@ adapters.forEach(function (adapter) {
           limit: 2,
           include_docs: true,
           complete: function (err, results) {
-            err.status.should.equal(404);
-            err.message.should.equal('missing json key: odd');
+            err.status.should.equal(PouchDB.Errors.MISSING_DOC.status,
+                                    'correct error status returned');
+            err.message.should.equal(PouchDB.Errors.MISSING_DOC.message,
+                                 'correct error message returned');
+            // todo: does not work in pouchdb-server.
+            // err.reason.should.equal('missing json key: odd');
             should.not.exist(results);
             done();
           }
@@ -343,8 +449,12 @@ adapters.forEach(function (adapter) {
           limit: 2,
           include_docs: true,
           complete: function (err, results) {
-            err.status.should.equal(404);
-            err.message.should.equal('missing json key: filters');
+            err.status.should.equal(PouchDB.Errors.MISSING_DOC.status,
+                                    'correct error status returned');
+            err.message.should.equal(PouchDB.Errors.MISSING_DOC.message,
+                                 'correct error message returned');
+            // todo: does not work in pouchdb-server.
+            // err.reason.should.equal('missing json key: filters');
             should.not.exist(results);
             done();
           }
@@ -353,10 +463,14 @@ adapters.forEach(function (adapter) {
     });
 
     it('Changes limit and filter', function (done) {
-      var docs = [
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
-        {_id: '2', integer: 2},
+        {_id: '2', integer: 2}
+      ];
+      var db = new PouchDB(dbs.name);
+
+      var docs2 = [
         {_id: '3', integer: 3},
         {_id: '4', integer: 4},
         {_id: '5', integer: 5},
@@ -366,26 +480,30 @@ adapters.forEach(function (adapter) {
           filters: { even: 'function (doc) { return doc.integer % 2 === 1; }' }
         }
       ];
-      var db = new PouchDB(dbs.name);
-      testUtils.writeDocs(db, docs, function (err, info) {
-        var promise = db.changes({
-          filter: 'foo/even',
-          limit: 2,
-          since: 2,
-          include_docs: true,
-          complete: function (err, results) {
-            results.results.length.should.equal(2);
-            results.results[0].id.should.equal('3');
-            results.results[0].seq.should.equal(4);
-            results.results[0].doc.integer.should.equal(3);
-            results.results[1].id.should.equal('5');
-            results.results[1].seq.should.equal(6);
-            results.results[1].doc.integer.should.equal(5);
-            done();
-          }
+
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          testUtils.writeDocs(db, docs2, function (err, info) {
+            var promise = db.changes({
+              filter: 'foo/even',
+              limit: 2,
+              since: update_seq,
+              include_docs: true,
+              complete: function (err, results) {
+                results.results.length.should.equal(2);
+                var three = findById(results.results, '3');
+                three.doc.integer.should.equal(3);
+                var five = findById(results.results, '5');
+                five.doc.integer.should.equal(5);
+                done();
+              }
+            });
+            should.exist(promise);
+            promise.cancel.should.be.a('function');
+          });
         });
-        should.exist(promise);
-        promise.cancel.should.be.a('function');
       });
     });
 
@@ -399,8 +517,10 @@ adapters.forEach(function (adapter) {
         db.changes({
           filter: 'foobar/odd',
           complete: function (err, results) {
-            err.status.should.equal(404);
-            err.message.should.equal('missing');
+            err.status.should.equal(PouchDB.Errors.MISSING_DOC.status,
+                                    'correct error status returned');
+            err.message.should.equal(PouchDB.Errors.MISSING_DOC.message,
+                                 'correct error message returned');
             should.not.exist(results);
             done();
           }
@@ -427,8 +547,12 @@ adapters.forEach(function (adapter) {
           filter: '_view',
           view: 'foo/odd',
           complete: function (err, results) {
-            err.status.should.equal(404);
-            err.message.should.equal('missing json key: odd');
+            err.status.should.equal(PouchDB.Errors.MISSING_DOC.status,
+                                    'correct error status returned');
+            err.message.should.equal(PouchDB.Errors.MISSING_DOC.message,
+                                 'correct error message returned');
+            // todo: does not work in pouchdb-server.
+            // err.reason.should.equal('missing json key: odd');
             should.not.exist(results);
             done();
           }
@@ -451,8 +575,13 @@ adapters.forEach(function (adapter) {
           filter: '_view',
           view: 'foo/even',
           complete: function (err, results) {
-            err.status.should.equal(404);
-            err.message.should.equal('missing json key: views');
+            err.status.should.equal(PouchDB.Errors.MISSING_DOC.status,
+                                    'correct error status returned');
+            err.message.should.equal(PouchDB.Errors.MISSING_DOC.message,
+                                 'correct error message returned');
+            // todo: does not work in pouchdb-server.
+            // err.reason.should.equal('missing json key: views',
+            //                         'correct error reason returned');
             should.not.exist(results);
             done();
           }
@@ -476,9 +605,14 @@ adapters.forEach(function (adapter) {
         db.changes({
           filter: '_view',
           complete: function (err, results) {
-            err.status.should.equal(400);
-            err.message.should
-              .equal('`view` filter parameter is not provided.');
+            err.status.should.equal(PouchDB.Errors.BAD_REQUEST.status,
+                                    'correct error status returned');
+            err.message.should.equal(PouchDB.Errors.BAD_REQUEST.message,
+                                 'correct error message returned');
+            // todo: does not work in pouchdb-server.
+            // err.reason.should
+            //   .equal('`view` filter parameter is not provided.',
+            //          'correct error reason returned');
             should.not.exist(results);
             done();
           }
@@ -487,44 +621,66 @@ adapters.forEach(function (adapter) {
     });
 
     it('Changes limit and view instead of filter', function (done) {
-      var docs = [
+      var docs1 = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
-        {_id: '2', integer: 2},
-        {_id: '3', integer: 3},
-        {_id: '4', integer: 4},
-        {_id: '5', integer: 5},
-        {
-          _id: '_design/foo',
-          integer: 4,
-          views: { even: { map: 'function (doc) { if (doc.integer % 2 === 1) ' +
-                           '{ emit(doc._id, null) }; }' } }
-        }
+        {_id: '2', integer: 2}
       ];
       var db = new PouchDB(dbs.name);
-      testUtils.writeDocs(db, docs, function (err, info) {
-        db.changes({
-          filter: '_view',
-          view: 'foo/even',
-          limit: 2,
-          since: 2,
-          include_docs: true,
-          complete: function (err, results) {
-            results.results.length.should.equal(2);
-            results.results[0].id.should.equal('3');
-            results.results[0].seq.should.equal(4);
-            results.results[0].doc.integer.should.equal(3);
-            results.results[1].id.should.equal('5');
-            results.results[1].seq.should.equal(6);
-            results.results[1].doc.integer.should.equal(5);
-            done();
-          }
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        db.info(function (err, info) {
+          var update_seq = info.update_seq;
+
+          var docs2 = [
+            {_id: '3', integer: 3},
+            {_id: '4', integer: 4},
+            {_id: '5', integer: 5},
+            {
+              _id: '_design/foo',
+              integer: 4,
+              views: { even: { map: 'function (doc) ' +
+                '{ if (doc.integer % 2 === 1) ' +
+                '{ emit(doc._id, null) }; }'
+                }
+              }
+            }
+          ];
+
+          db.bulkDocs({ docs: docs2 }, function (err, info) {
+
+            db.changes({
+              filter: '_view',
+              view: 'foo/even',
+              limit: 2,
+              since: update_seq,
+              include_docs: true,
+              complete: function (err, results) {
+                var changes = results.results;
+                changes.length.should.equal(2);
+
+                findById(changes, '3')
+                  .doc.integer.should.equal(3);
+
+                findById(changes, '5')
+                  .doc.integer.should.equal(5);
+
+                done();
+              }
+            });
+          });
         });
       });
     });
 
-
     it('Changes last_seq', function (done) {
+      // this test doesn't really make sense for clustered
+      // CouchDB because changes is unordered and last_seq might
+      // not equal the last seq in the _changes feed (although it
+      // should evaluate to the same thing on the server).
+      if (testUtils.isCouchMaster()) {
+        return done();
+      }
+
       var docs = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
@@ -560,6 +716,14 @@ adapters.forEach(function (adapter) {
     });
 
     it('Changes last_seq with view instead of filter', function (done) {
+      // this test doesn't really make sense for clustered
+      // CouchDB because changes is unordered and last_seq might
+      // not equal the last seq in the _changes feed (although it
+      // should evaluate to the same thing on the server).
+      if (testUtils.isCouchMaster()) {
+        return done();
+      }
+
       var docs = [
         {_id: '0', integer: 0},
         {_id: '1', integer: 1},
@@ -695,6 +859,11 @@ adapters.forEach(function (adapter) {
     // Note for the following test that CouchDB's implementation of /_changes
     // with `descending=true` ignores any `since` parameter.
     it('Descending changes', function (done) {
+      // _changes in CouchDB 2.0 does not guarantee order
+      // so skip this test
+      if (testUtils.isCouchMaster()) {
+        return done();
+      }
       var db = new PouchDB(dbs.name);
       db.post({_id: '0', test: 'ing'}, function (err, res) {
         db.post({_id: '1', test: 'ing'}, function (err, res) {
@@ -1037,6 +1206,624 @@ adapters.forEach(function (adapter) {
       db.post({ test: 'adoc' });
     });
 
+    it('#3136 style=all_docs', function () {
+
+      var db = new PouchDB(dbs.name);
+
+      var chain = PouchDB.utils.Promise.resolve();
+
+      var docIds = ['b', 'c', 'a', 'z', 'd', 'e'];
+
+      docIds.forEach(function (docId) {
+        chain = chain.then(function () {
+          return db.put({_id: docId});
+        });
+      });
+
+      return chain.then(function () {
+        return db.changes({style: 'all_docs'});
+      }).then(function (res) {
+        var ids = res.results.map(function (x) {
+          return x.id;
+        });
+        ids.should.include.members(docIds);
+      });
+    });
+
+    it('#3136 style=all_docs & include_docs', function () {
+
+      var db = new PouchDB(dbs.name);
+
+      var chain = PouchDB.utils.Promise.resolve();
+
+      var docIds = ['b', 'c', 'a', 'z', 'd', 'e'];
+
+      docIds.forEach(function (docId) {
+        chain = chain.then(function () {
+          return db.put({_id: docId});
+        });
+      });
+
+      return chain.then(function () {
+        return db.changes({
+          style: 'all_docs',
+          include_docs: true
+        });
+      }).then(function (res) {
+        var ids = res.results.map(function (x) {
+          return x.id;
+        });
+        ids.should.include.members(docIds);
+      });
+    });
+
+    it('#3136 tricky changes, limit/descending', function () {
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+
+      var db = new PouchDB(dbs.name);
+
+      var docs = [
+        {
+          _id: 'alpha',
+          _rev: '1-a',
+          _revisions: {
+            start: 1,
+            ids: ['a']
+          }
+        }, {
+          _id: 'beta',
+          _rev: '1-b',
+          _revisions: {
+            start: 1,
+            ids: ['b']
+          }
+        }, {
+          _id: 'gamma',
+          _rev: '1-b',
+          _revisions: {
+            start: 1,
+            ids: ['b']
+          }
+        }, {
+          _id: 'alpha',
+          _rev: '2-d',
+          _revisions: {
+            start: 2,
+            ids: ['d', 'a']
+          }
+        }, {
+          _id: 'beta',
+          _rev: '2-e',
+          _revisions: {
+            start: 2,
+            ids: ['e', 'b']
+          }
+        }, {
+          _id: 'beta',
+          _rev: '3-f',
+          _deleted: true,
+          _revisions: {
+            start: 3,
+            ids: ['f', 'e', 'b']
+          }
+        }
+      ];
+
+      var chain = PouchDB.utils.Promise.resolve();
+      var seqs = [];
+
+      docs.forEach(function (doc) {
+        chain = chain.then(function () {
+          return db.bulkDocs([doc], {new_edits: false}).then(function () {
+            return db.changes({doc_ids: [doc._id]});
+          }).then(function (res) {
+            seqs.push(res.results[0].seq);
+          });
+        });
+      });
+
+      function normalizeResult(result) {
+        // order of changes doesn't matter
+        result.results.forEach(function (ch) {
+          ch.changes = ch.changes.sort(function (a, b) {
+            return a.rev < b.rev ? -1 : 1;
+          });
+        });
+      }
+
+      return chain.then(function () {
+        return db.changes();
+      }).then(function (result) {
+        normalizeResult(result);
+        delete result.last_seq;
+        result.should.deep.equal({
+          "results": [
+            {
+              "seq": seqs[2],
+              "id": "gamma",
+              "changes": [{ "rev": "1-b"}
+              ]
+            },
+            {
+              "seq": seqs[3],
+              "id": "alpha",
+              "changes": [{ "rev": "2-d"}
+              ]
+            },
+            {
+              "seq": seqs[5],
+              "id": "beta",
+              "deleted": true,
+              "changes": [{ "rev": "3-f"}
+              ]
+            }
+          ]
+          //, "last_seq": seqs[5]
+        });
+        return db.changes({limit: 0});
+      }).then(function (result) {
+        normalizeResult(result);
+        delete result.last_seq;
+        result.should.deep.equal({
+          "results": [{
+            "seq": seqs[2],
+            "id": "gamma",
+            "changes": [{"rev": "1-b"}]
+          }]
+          //, "last_seq": seqs[2]
+        }, '1:' + JSON.stringify(result));
+        return db.changes({limit: 1});
+      }).then(function (result) {
+        normalizeResult(result);
+        delete result.last_seq;
+        result.should.deep.equal({
+          "results": [{
+            "seq": seqs[2],
+            "id": "gamma",
+            "changes": [{"rev": "1-b"}]
+          }]
+          //, "last_seq": seqs[2]
+        }, '2:' + JSON.stringify(result));
+        return db.changes({limit: 2});
+      }).then(function (result) {
+        normalizeResult(result);
+        delete result.last_seq;
+        result.should.deep.equal({
+          "results": [{
+            "seq": seqs[2],
+            "id": "gamma",
+            "changes": [{"rev": "1-b"}]
+          }, {"seq": seqs[3], "id": "alpha", "changes": [{"rev": "2-d"}]}]
+          //, last_seq": seqs[3]
+        }, '3:' + JSON.stringify(result));
+        return db.changes({limit: 1, descending: true});
+      }).then(function (result) {
+        normalizeResult(result);
+        delete result.last_seq;
+        result.should.deep.equal({
+          "results": [{
+            "seq": seqs[5],
+            "id": "beta",
+            "changes": [{"rev": "3-f"}],
+            "deleted": true
+          }]
+          //, "last_seq": seqs[5]
+        }, '4:' + JSON.stringify(result));
+        return db.changes({limit: 2, descending: true});
+      }).then(function (result) {
+        normalizeResult(result);
+        delete result.last_seq;
+        var expected = {
+          "results": [{
+            "seq": seqs[5],
+            "id": "beta",
+            "changes": [{"rev": "3-f"}],
+            "deleted": true
+          }, {"seq": seqs[3], "id": "alpha", "changes": [{"rev": "2-d"}]}]
+          //, "last_seq": seqs[3]
+        };
+        result.should.deep.equal(expected, '5:' + JSON.stringify(result) +
+        ', shoulda got: ' + JSON.stringify(expected));
+        return db.changes({descending: true});
+      }).then(function (result) {
+        normalizeResult(result);
+        delete result.last_seq;
+        var expected = {
+          "results": [{
+            "seq": seqs[5],
+            "id": "beta",
+            "changes": [{"rev": "3-f"}],
+            "deleted": true
+          }, {"seq": seqs[3], "id": "alpha", "changes": [{"rev": "2-d"}]}, {
+            "seq": seqs[2],
+            "id": "gamma",
+            "changes": [{"rev": "1-b"}]
+          }]
+          //, "last_seq": seqs[2]
+        };
+        result.should.deep.equal(expected, '6:' + JSON.stringify(result) +
+        ', shoulda got: ' + JSON.stringify(expected));
+      });
+    });
+
+    it('#3136 winningRev has a lower seq, style=all_docs', function () {
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+      
+      var db = new PouchDB(dbs.name);
+      var tree = [
+        [
+          {
+            _id: 'foo',
+            _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '2-e',
+            _deleted: true,
+            _revisions: {start: 2, ids: ['e', 'a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '3-g',
+            _revisions: {start: 3, ids: ['g', 'e', 'a']}
+          }
+        ],
+        [
+          {
+            _id: 'foo',
+            _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '2-b',
+            _revisions: {start: 2, ids: ['b', 'a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '3-c',
+            _revisions: {start: 3, ids: ['c', 'b', 'a']}
+          }
+        ],
+        [
+          {
+            _id: 'foo',
+            _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '2-d',
+            _revisions: {start: 2, ids: ['d', 'a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '3-h',
+            _revisions: {start: 3, ids: ['h', 'd', 'a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '4-f',
+            _revisions: {start: 4, ids: ['f', 'h', 'd', 'a']}
+          }
+        ]
+      ];
+
+      var chain = PouchDB.utils.Promise.resolve();
+      var seqs = [0];
+
+      function getExpected(i) {
+        var expecteds = [
+          {
+            "results": [
+              {
+                "seq": seqs[1],
+                "id": "foo",
+                "changes": [{"rev": "3-g"}],
+                "doc": {"_id": "foo", "_rev": "3-g"}
+              }
+            ],
+            "last_seq" : seqs[1]
+          },
+          {
+            "results": [
+              {
+                "seq": seqs[2],
+                "id": "foo",
+                "changes": [{"rev": "3-c"}, {"rev": "3-g"}],
+                "doc": {"_id": "foo", "_rev": "3-g"}
+              }
+            ],
+            "last_seq" : seqs[2]
+          },
+          {
+            "results": [
+              {
+                "seq": seqs[3],
+                "id": "foo",
+                "changes": [{"rev": "3-c"}, {"rev": "3-g"}, {"rev": "4-f"}],
+                "doc": {"_id": "foo", "_rev": "4-f"}
+              }
+            ],
+            "last_seq" : seqs[3]
+          }
+        ];
+        return expecteds[i];
+      }
+
+      function normalizeResult(result) {
+        // order of changes doesn't matter
+        result.results.forEach(function (ch) {
+          ch.changes = ch.changes.sort(function (a, b) {
+            return a.rev < b.rev ? -1 : 1;
+          });
+        });
+      }
+
+      tree.forEach(function (docs, i) {
+        chain = chain.then(function () {
+          return db.bulkDocs(docs, {new_edits: false}).then(function () {
+            return db.changes({
+              style: 'all_docs',
+              since: seqs[seqs.length - 1],
+              include_docs: true
+            });
+          }).then(function (result) {
+            seqs.push(result.last_seq);
+            var expected = getExpected(i);
+            normalizeResult(result);
+            result.should.deep.equal(expected,
+            i + ': should get: ' + JSON.stringify(expected) +
+            ', but got: ' + JSON.stringify(result));
+          });
+        });
+      });
+      return chain;
+    });
+
+    it('#3136 winningRev has a lower seq, style=all_docs 2', function () {
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+
+      var db = new PouchDB(dbs.name);
+      var tree = [
+        [
+          {
+            _id: 'foo',
+            _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '2-e',
+            _deleted: true,
+            _revisions: {start: 2, ids: ['e', 'a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '3-g',
+            _revisions: {start: 3, ids: ['g', 'e', 'a']}
+          }
+        ], [
+          {
+            _id: 'foo',
+            _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '2-b',
+            _revisions: {start: 2, ids: ['b', 'a']}
+          },
+          {
+            _id: 'foo',
+            _rev: '3-c',
+            _revisions: {start: 3, ids: ['c', 'b', 'a']}
+          },
+        ], [
+          {
+            _id: 'bar',
+            _rev: '1-z',
+            _revisions: {start: 1, ids: ['z']}
+          }
+        ]
+      ];
+
+      var chain = PouchDB.utils.Promise.resolve();
+      var seqs = [0];
+
+      tree.forEach(function (docs, i) {
+        chain = chain.then(function () {
+          return db.bulkDocs(docs, {new_edits: false}).then(function () {
+            return db.changes();
+          }).then(function (result) {
+            seqs.push(result.last_seq);
+          });
+        });
+      });
+
+      return chain.then(function () {
+
+        var expecteds = [
+          {
+            "results": [{
+              "seq": seqs[2],
+              "id": "foo",
+              "changes": [{"rev": "3-c"}, {"rev": "3-g"}]
+            }, {"seq": seqs[3], "id": "bar", "changes": [{"rev": "1-z"}]}],
+            "last_seq": seqs[3]
+          },
+          {
+            "results": [{
+              "seq": seqs[2],
+              "id": "foo",
+              "changes": [{"rev": "3-c"}, {"rev": "3-g"}]
+            }, {"seq": seqs[3], "id": "bar", "changes": [{"rev": "1-z"}]}],
+            "last_seq": seqs[3]
+          },
+          {
+            "results": [{"seq": seqs[3], "id": "bar",
+              "changes": [{"rev": "1-z"}]}],
+            "last_seq": seqs[3]
+          },
+          {"results": [], "last_seq": seqs[3]}
+        ];
+
+        var chain2 = PouchDB.utils.Promise.resolve();
+
+        function normalizeResult(result) {
+          // order of changes doesn't matter
+          result.results.forEach(function (ch) {
+            ch.changes = ch.changes.sort(function (a, b) {
+              return a.rev < b.rev ? -1 : 1;
+            });
+          });
+        }
+
+        seqs.forEach(function (seq, i) {
+          chain2 = chain2.then(function () {
+            return db.changes({
+              since: seq,
+              style: 'all_docs'
+            }).then(function (res) {
+              normalizeResult(res);
+              res.should.deep.equal(expecteds[i], 'since=' + seq +
+              ': got: ' +
+              JSON.stringify(res) +
+              ', shoulda got: ' +
+              JSON.stringify(expecteds[i]));
+            });
+          });
+        });
+        return chain2;
+      });
+    });
+
+    it('#3136 winningRev has a higher seq, using limit', function () {
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+
+      var db = new PouchDB(dbs.name);
+      var tree = [
+        [
+          {
+            _id: 'foo',
+            _rev: '1-a',
+            _revisions: {start: 1, ids: ['a']}
+          }
+        ], [
+          {
+            _id: 'foo',
+            _rev: '2-b',
+            _revisions: {start: 2, ids: ['b', 'a']}
+          }
+        ], [
+          {
+            _id: 'bar',
+            _rev: '1-x',
+            _revisions: {start: 1, ids: ['x']}
+          }
+        ], [
+          {
+            _id: 'foo',
+            _rev: '2-c',
+            _deleted: true,
+            _revisions: {start: 2, ids: ['c', 'a']}
+          },
+        ]
+      ];
+
+      var chain = PouchDB.utils.Promise.resolve();
+      var seqs = [0];
+
+      tree.forEach(function (docs, i) {
+        chain = chain.then(function () {
+          return db.bulkDocs(docs, {new_edits: false}).then(function () {
+            return db.changes().then(function (result) {
+              seqs.push(result.last_seq);
+            });
+          });
+        });
+      });
+
+      return chain.then(function () {
+
+        var expecteds = [{
+          "results": [{
+            "seq": seqs[3],
+            "id": "bar",
+            "changes": [{"rev": "1-x"}],
+            "doc": {"_id": "bar", "_rev": "1-x"}
+          }],
+          "last_seq": seqs[3]
+        },
+          {
+            "results": [{
+              "seq": seqs[3],
+              "id": "bar",
+              "changes": [{"rev": "1-x"}],
+              "doc": {"_id": "bar", "_rev": "1-x"}
+            }],
+            "last_seq": seqs[3]
+          },
+          {
+            "results": [{
+              "seq": seqs[3],
+              "id": "bar",
+              "changes": [{"rev": "1-x"}],
+              "doc": {"_id": "bar", "_rev": "1-x"}
+            }],
+            "last_seq": seqs[3]
+          },
+          {
+            "results": [{
+              "seq": seqs[4],
+              "id": "foo",
+              "changes": [{"rev": "2-b"}, {"rev": "2-c"}],
+              "doc": {"_id": "foo", "_rev": "2-b"}
+            }],
+            "last_seq": seqs[4]
+          },
+          {"results": [], "last_seq": seqs[4]}
+        ];
+
+        var chain2 = PouchDB.utils.Promise.resolve();
+
+        function normalizeResult(result) {
+          // order of changes doesn't matter
+          result.results.forEach(function (ch) {
+            ch.changes = ch.changes.sort(function (a, b) {
+              return a.rev < b.rev ? -1 : 1;
+            });
+          });
+        }
+
+        seqs.forEach(function (seq, i) {
+          chain2 = chain2.then(function () {
+            return db.changes({
+              style: 'all_docs',
+              since: seq,
+              limit: 1,
+              include_docs: true
+            });
+          }).then(function (result) {
+            normalizeResult(result);
+            result.should.deep.equal(expecteds[i],
+              i + ': got: ' + JSON.stringify(result) +
+              ', shoulda got: ' + JSON.stringify(expecteds[i]));
+          });
+        });
+        return chain2;
+      });
+    });
+
     it('changes-filter', function (done) {
       var docs1 = [
         {_id: '0', integer: 0},
@@ -1156,6 +1943,11 @@ adapters.forEach(function (adapter) {
     });
 
     it('#2569 Big non-live doc_ids filter', function () {
+      // blocked on https://issues.apache.org/jira/browse/COUCHDB-2530
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+      
       var docs = [];
       for (var i = 0; i < 5; i++) {
         var id = '';
@@ -1211,6 +2003,11 @@ adapters.forEach(function (adapter) {
     });
 
     it('#2569 Big live doc_ids filter', function () {
+      // blocked on https://issues.apache.org/jira/browse/COUCHDB-2530
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+
       var docs = [];
       for (var i = 0; i < 5; i++) {
         var id = '';
@@ -1307,10 +2104,10 @@ adapters.forEach(function (adapter) {
               include_docs: true,
               complete: function (err, changes) {
                 changes.results.length.should.equal(4);
-                changes.results[2].seq.should.equal(5);
-                changes.results[2].id.should.equal('2');
-                changes.results[2].changes.length.should.equal(1);
-                changes.results[2].doc.integer.should.equal(11);
+
+                var second = findById(changes.results, '2');
+                second.changes.length.should.equal(1);
+                second.doc.integer.should.equal(11);
                 done();
               }
             });
@@ -1370,8 +2167,7 @@ adapters.forEach(function (adapter) {
                         }).on('error', testDone)
                         .then(function (changes) {
                             changes.results.length.should.equal(4);
-                            var ch = changes.results[3];
-                            ch.id.should.equal('3');
+                            var ch = findById(changes.results, '3');
                             ch.changes.length.should.equal(2);
                             ch.doc.integer.should.equal(30);
                             ch.doc._rev.should.equal(rev4local);
@@ -1379,6 +2175,12 @@ adapters.forEach(function (adapter) {
                               { rev: rev4local },
                               { rev: remoterev }
                             ]);
+
+                            // Blocked on COUCHDB-2518
+                            if (testUtils.isCouchMaster()) {
+                              return;
+                            }
+
                             ch.doc.should.have.property('_conflicts');
                             ch.doc._conflicts.length.should.equal(1);
                             ch.doc._conflicts[0].should.equal(remoterev);
@@ -1414,9 +2216,11 @@ adapters.forEach(function (adapter) {
             include_docs: true,
             complete: function (err, changes) {
               changes.results.length.should.equal(4);
-              var ch = changes.results[3];
-              ch.id.should.equal('3');
-              ch.seq.should.equal(5);
+              var ch = findById(changes.results, '3');
+              // sequence numbers are not incremental in CouchDB 2.0
+              if (!testUtils.isCouchMaster()) {
+                ch.seq.should.equal(5);
+              }
               ch.deleted.should.equal(true);
               done();
             }
@@ -1453,7 +2257,12 @@ adapters.forEach(function (adapter) {
             since: 'now',
             complete: function (err, res) {
               should.not.exist(err);
-              res.last_seq.should.equal(info.update_seq);
+
+              // last_seq and update_seq might be encoded differently
+              // in clustered CouchDB - they cannot be reliably compared.
+              if (!testUtils.isCouchMaster()) {
+                res.last_seq.should.equal(info.update_seq);
+              }
               done();
             }
           });
@@ -1472,7 +2281,11 @@ adapters.forEach(function (adapter) {
             since: 'latest',
             complete: function (err, res) {
               should.not.exist(err);
-              res.last_seq.should.equal(info.update_seq);
+              // last_seq and update_seq might be encoded differently
+              // in clustered CouchDB - they cannot be reliably compared.
+              if (!testUtils.isCouchMaster()) {
+                res.last_seq.should.equal(info.update_seq);
+              }
               done();
             }
           });
@@ -1725,6 +2538,78 @@ adapters.forEach(function (adapter) {
           done(err);
         });
       }, done);
+    });
+
+    it('it handles a bunch of individual changes in live replication',
+      function (done) {
+      var db = new PouchDB(dbs.name);
+      var len = 80;
+      var called = 0;
+      var changesDone = false;
+      var changesWritten = 0;
+      var changes = db.changes({live: true});
+
+      changes.on('change', function () {
+        called++;
+        if (called === len) {
+          changes.cancel();
+        }
+      }).on('error', done).on('complete', function () {
+        changesDone = true;
+        maybeDone();
+      });
+
+      var i = -1;
+
+      function maybeDone() {
+        if (changesDone && changesWritten === len) {
+          done();
+        }
+      }
+
+      function after() {
+        changesWritten++;
+        db.listeners('destroyed').should.have.length.lessThan(5);
+        maybeDone();
+      }
+
+      while (++i < len) {
+        db.post({}).then(after).catch(done);
+      }
+
+    });
+
+    it('changes-filter without filter', function (done) {
+      var docs1 = [
+        {_id: '0', integer: 0},
+        {_id: '1', integer: 1},
+        {_id: '2', integer: 2},
+        {_id: '3', integer: 3},
+      ];
+      var docs2 = [
+        {_id: '4', integer: 4},
+        {_id: '5', integer: 5},
+        {_id: '6', integer: 6},
+        {_id: '7', integer: 7},
+      ];
+      var db = new PouchDB(dbs.name);
+      var count = 0;
+      db.bulkDocs({ docs: docs1 }, function (err, info) {
+        var changes = db.changes({
+          complete: function (err, result) {
+            result.status.should.equal('cancelled');
+            done();
+          },
+          onChange: function (change) {
+            count += 1;
+            if (count === 8) {
+              changes.cancel();
+            }
+          },
+          live: true
+        });
+        db.bulkDocs({ docs: docs2 });
+      });
     });
   });
 });
