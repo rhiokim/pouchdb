@@ -4,7 +4,7 @@ title: API Reference
 sidebar: api.html
 ---
 
-Most of the PouchDB API is exposed as `fun(arg, [options], [callback])` where both the options and the callback are optional. Callbacks use the `function(err, result)` idiom where the first argument will be undefined unless there is an error, and the second argument holds the result. 
+Most of the PouchDB API is exposed as `fun(arg, [options], [callback])` where both the options and the callback are optional. Callbacks use the `function(err, result)` idiom where the first argument will be undefined unless there is an error, and the second argument holds the result.
 
 Additionally, any method that only returns a single thing (e.g. `db.get`) also returns a [promise][]. Promises come from the minimal library [lie][] in the browser, and the feature-rich [Bluebird][] in Node.
 
@@ -18,7 +18,7 @@ Additionally, any method that only returns a single thing (e.g. `db.get`) also r
 new PouchDB([name], [options])
 {% endhighlight %}
 
-This method creates a database or opens an existing one. If you use a URL like `'http://domain.com/dbname'` then PouchDB will work as a client to an online CouchDB instance.  Otherwise it will create a local database using whatever backend is present (i.e. IndexedDB, WebSQL, or LevelDB). 
+This method creates a database or opens an existing one. If you use a URL like `'http://domain.com/dbname'` then PouchDB will work as a client to an online CouchDB instance.  Otherwise it will create a local database using whatever backend is present (i.e. IndexedDB, WebSQL, or LevelDB).
 
 ### Options
 
@@ -28,7 +28,7 @@ This method creates a database or opens an existing one. If you use a URL like `
 * `options.ajax`: An object of options to be sent to the ajax requester. In Node they are sent verbatim to [request][] with the exception of:
     * `options.ajax.cache`: Appends a random string to the end of all HTTP GET requests to avoid them being cached on IE. Set this to `true` to prevent this happening.
 
-**Notes:** 
+**Notes:**
 
 1. In IndexedDB and WebSQL, PouchDB will use `_pouch_` to prefix the internal database names. Do not manually create databases with the same prefix.
 2. When acting as a client on Node, any other options given will be passed to [request][].
@@ -82,7 +82,7 @@ You can also delete a database using just the name:
 PouchDB.destroy('dbname', function(err, info) { });
 {% endhighlight %}
 
-{% include anchor.html title="Create / update a document" hash="create_document" %}
+{% include anchor.html title="Create/update a document" hash="create_document" %}
 
 ### Using db.put()
 {% highlight js %}
@@ -281,13 +281,13 @@ db.bulkDocs([
 {% highlight js %}
 [
     {
-        "ok": true, 
-        "id": "06F1740A-8E8A-4645-A2E9-0D8A8C0C983A", 
+        "ok": true,
+        "id": "06F1740A-8E8A-4645-A2E9-0D8A8C0C983A",
         "rev": "1-84abc2a942007bee7cf55007cba56198"
-    }, 
+    },
     {
-        "ok": true, 
-        "id": "6244FB45-91DB-41E5-94FF-58C540E91844", 
+        "ok": true,
+        "id": "6244FB45-91DB-41E5-94FF-58C540E91844",
         "rev": "1-7b80fc50b6af7a905f368670429a757e"
     }
 ]
@@ -300,15 +300,15 @@ Then you can update those same docs:
 {% highlight js %}
 db.bulkDocs([
   {
-    title  : 'Lisa Says', 
+    title  : 'Lisa Says',
     artist : 'Velvet Underground',
-    _id    : "06F1740A-8E8A-4645-A2E9-0D8A8C0C983A", 
+    _id    : "06F1740A-8E8A-4645-A2E9-0D8A8C0C983A",
     _rev   : "1-84abc2a942007bee7cf55007cba56198"
   },
   {
     title  : 'Space Oddity',
 	artist : 'David Bowie',
-    _id    : "6244FB45-91DB-41E5-94FF-58C540E91844", 
+    _id    : "6244FB45-91DB-41E5-94FF-58C540E91844",
     _rev   : "1-7b80fc50b6af7a905f368670429a757e"
   }
 ], function(err, response) { });
@@ -319,15 +319,15 @@ Or delete them:
 {% highlight js %}
 db.bulkDocs([
   {
-    title    : 'Lisa Says', 
+    title    : 'Lisa Says',
     _deleted : true,
-    _id      : "06F1740A-8E8A-4645-A2E9-0D8A8C0C983A", 
+    _id      : "06F1740A-8E8A-4645-A2E9-0D8A8C0C983A",
     _rev     : "1-84abc2a942007bee7cf55007cba56198"
   },
   {
     title    : 'Space Oddity',
 	_deleted : true,
-    _id      : "6244FB45-91DB-41E5-94FF-58C540E91844", 
+    _id      : "6244FB45-91DB-41E5-94FF-58C540E91844",
     _rev     : "1-7b80fc50b6af7a905f368670429a757e"
   }
 ], function(err, response) { });
@@ -397,7 +397,7 @@ db.changes(options)
 {% endhighlight %}
 
 A list of changes made to documents in the database, in the order they were made.
-It returns an object with the method `cancel()`, which you call if you don't want to listen to new changes anymore. 
+It returns an object with the method `cancel()`, which you call if you don't want to listen to new changes anymore.
 
 It is an [event emitter][event emitter] and will emit a `'change'` event on each document change, a `'complete'` event when all the changes have been processed, and an `'error'` event when an error occurs. In addition to the `'change'` event, any change will also emit a `'create'`, `'update'`, or `'delete'` event.
 
@@ -412,7 +412,7 @@ All options default to `false` unless otherwise specified.
 * `options.filter`: Reference a filter function from a design document to selectively get updates.
 * `options.doc_ids`: Only show changes for docs with these ids (array of strings).
 * `options.since`: Start the results from the change immediately after the given sequence number, you can also pass 'now' if you want only new changes.
-* `options.live`: Uses the  `_longpoll_` feed. 
+* `options.live`: Uses the  `_longpoll_` feed.
 * `options.limit`: Limit the number of results to this number.
 * `options.style`: Specifies how many revisions are returned in the changes array. The default, `'main_only'`, will only return the current "winning" revision; `'all_docs'` will return all leaf revisions (including conflicts and deleted former conflicts).
 * `options.view`: Specify a view function to act as a filter. Documents counted as "passed" for a view filter if a map function emits at least one record for them.
@@ -497,16 +497,16 @@ PouchDB.replicate(source, target, [options])
 
 Replicate data from `source` to `target`.  Both the `source` and `target` can be a PouchDB instance or a string representing a CouchDB database URL or the name of a local PouchDB database. If `options.live` is `true`, then this will track future changes and also replicate them automatically. This method returns an object with the method `cancel()`, which you call if you want to cancel live replication.
 
-Replication is an event emiter like `changes()` and emits the `'complete'`, `'uptodate'`, `'change'` and `'error'` events.
+Replication is an event emiter like `changes()` and emits the `'complete'`, `'active'`, `'paused'`, `'change'`, `'denied'` and `'error'` events.
 
 ### Options
 
 All options default to `false` unless otherwise specified.
 
+* `options.live`: If `true`, starts subscribing to future changes in the `source` database and continue replicating them.
 * `options.filter`: Reference a filter function from a design document to selectively get updates.
 * `options.query_params`: Query params sent to the filter function.
 * `options.doc_ids`: Only replicate docs with these ids (array of strings).
-* `options.live`: If `true`, starts subscribing to future changes in the `source` database and continue replicating them.
 * `options.since`: Replicate changes after the given sequence number.
 * `options.create_target`: Create target database if it does not exist. Only for server replications.
 * `options.batch_size`: Number of documents to process at a time. Defaults to 100. This affects the number of docs held in memory and the number sent at a time to the target server. You may need to adjust downward if targeting devices with low amounts of memory (e.g. phones) or if the documents are large in size (e.g. with attachments). If your documents are small in size, then increasing this number will probably speed replication up.
@@ -514,18 +514,16 @@ All options default to `false` unless otherwise specified.
 
 #### Example Usage:
 {% highlight js %}
-var replication = PouchDB.replicate('mydb', 'http://localhost:5984/mydb', {live: true})
+var rep = PouchDB.replicate('mydb', 'http://localhost:5984/mydb', {live: true})
   .on('change', function (info) {
     // handle change
   }).on('complete', function (info) {
     // handle complete
-  }).on('uptodate', function (info) {
-    // handle up-to-date
   }).on('error', function (err) {
     // handle error
   });
-  
-replication.cancel(); // whenever you want to cancel
+
+rep.cancel(); // whenever you want to cancel
 {% endhighlight %}
 
 There are also shorthands for replication given existing PouchDB objects. These behave the same as `PouchDB.replicate()`:
@@ -536,10 +534,15 @@ db.replicate.to(remoteDB, [options]);
 db.replicate.from(remoteDB, [options]);
 {% endhighlight %}
 
-**Notes:**
+### Replication events
 
-* The `'complete'` event only fires when you aren't doing live replication, or when live replication fails.
-* The `'uptodate'` event fires during live replication, when the target database is up-to-date and just idling, waiting for new changes.
+* `change` - This event fires when the replication has written a new document.
+* `complete` - This event fires when replication is completed or cancelled. In a live replication, only cancelling the replication should trigger this event.
+* `paused` - This event fires when the replication is paused, either because a live replication is waiting for changes, or replication has temporarily failed and is attempting to resume.
+* `active` - This event fires when the replication starts actively processing changes; e.g. when it recovers from an error or new changes are available.
+* `denied` - This event fires if a document failed to replicate due to validation or authorization errors.
+* `error`` - This event is fired when the replication is stopped due to an unrecoverable failure.
+* `uptodate` (*DEPRECATED*) - This event fires when a live replication has caught up and is waiting on future changes. This should be replaced by using the `paused` event.
 
 #### Example Response:
 
@@ -547,12 +550,12 @@ Example response in the `'change'` listener:
 
 {% highlight js %}
 {
-  "doc_write_failures": 0, 
-  "docs_read": 1, 
-  "docs_written": 1, 
-  "errors": [], 
-  "last_seq": 1, 
-  "ok": true, 
+  "doc_write_failures": 0,
+  "docs_read": 1,
+  "docs_written": 1,
+  "errors": [],
+  "last_seq": 1,
+  "ok": true,
   "start_time": "Fri May 16 2014 18:23:12 GMT-0700 (PDT)"
 }
 {% endhighlight %}
@@ -561,14 +564,14 @@ Example response in the `'complete'` listener:
 
 {% highlight js %}
 {
-  "doc_write_failures": 0, 
-  "docs_read": 2, 
-  "docs_written": 2, 
-  "end_time": "Fri May 16 2014 18:26:00 GMT-0700 (PDT)", 
-  "errors": [], 
-  "last_seq": 2, 
-  "ok": true, 
-  "start_time": "Fri May 16 2014 18:26:00 GMT-0700 (PDT)", 
+  "doc_write_failures": 0,
+  "docs_read": 2,
+  "docs_written": 2,
+  "end_time": "Fri May 16 2014 18:26:00 GMT-0700 (PDT)",
+  "errors": [],
+  "last_seq": 2,
+  "ok": true,
+  "start_time": "Fri May 16 2014 18:26:00 GMT-0700 (PDT)",
   "status": "complete"
 }
 {% endhighlight %}
@@ -618,7 +621,7 @@ var sync = PouchDB.sync('mydb', 'http://localhost:5984/mydb', {live: true})
   }).on('error', function (err) {
     // handle error
   });
-  
+
 sync.cancel(); // whenever you want to cancel
 {% endhighlight %}
 
@@ -740,7 +743,7 @@ Since views perform a full scan of all documents, this method may be slow, unles
 
 All options default to `false` unless otherwise specified.
 
-* `fun`: Map/reduce function, which can be one of the following: 
+* `fun`: Map/reduce function, which can be one of the following:
   * A map function by itself (no reduce).
   * A full CouchDB-style map/reduce object: `{map : ..., reduce: ...}`.
   * The name of a view in an existing design document (e.g. `'myview'` or `'mydesigndoc/myview'`).
@@ -761,7 +764,7 @@ All options default to `false` unless otherwise specified.
     - The rows are returned in the same order as the supplied `keys` array.
     - The row for a deleted document will have the revision ID of the deletion, and an extra key `"deleted":true` in the `value` property.
     - The row for a nonexistent document will just contain an `"error"` property with the value `"not_found"`.
-* `options.group`: True if you want the reduce function to group results by keys, rather than returning a single result. Defaults to `false`. 
+* `options.group`: True if you want the reduce function to group results by keys, rather than returning a single result. Defaults to `false`.
 * `options.group_level`: Number of elements in a key to group by, assuming the keys are arrays. Defaults to the full length of the array.
 * `options.stale`: One of `'ok'` or `'update_after'`.  Only applies to saved views. Can be one of:
     * unspecified (default): Returns the latest results, waiting for the view to build if necessary.
@@ -844,7 +847,7 @@ db.query(map, function (err, response) {});
 }
 {% endhighlight %}
 
-**Tips:** 
+**Tips:**
 
 * CouchDB sorts objects last, so `{startkey: ['Williams'], endkey: ['Williams', {}]}` would return all people with the last name `'Williams'`.
 * `group_level` can be very helpful when working with complex keys.  In the example above, you can use `{group_level: 1}` to group by last name, or `{group_level: 2}` to group by last and first name.
@@ -946,7 +949,7 @@ You don't actuallly have to call them by those names, though:
 var myId = 'foo';
 db.query(function(thisIs, awesome) {
   if (thisIs._id === myId) {
-    awesome(thisIs); 
+    awesome(thisIs);
   }
 }, function(err, results) { /* ... */ });
 {% endhighlight %}
@@ -1011,9 +1014,20 @@ db.info(function(err, info) { })
 db.compact([options], [callback])
 {% endhighlight %}
 
-Triggers a compaction operation for `db` on the local or remote database. This reduces the database's size by removing unused and old data. If a `callback` function is specified, Pouch checks compaction status at regular intervals and fires the callback upon completion. Consult the [compaction section of CouchDB's maintenance documentation](http://couchdb.readthedocs.org/en/latest/maintenance/compaction.html) for more detail about database compaction.
+Triggers a compaction operation in the local or remote database. This reduces the database's size by removing unused and old data, namely non-leaf revisions and attachments that are no longer referenced by those revisions. Note that this is a separate operation from [`viewCleanup()`](#view_cleanup).
 
-* `options.interval`: Number of milliseconds Pouch waits before asking again if compaction is already done. Defaults to 200.
+For remote databases, PouchDB checks the compaction status at regular intervals and fires the callback (or resolves the promise) upon completion. Consult the [compaction section of CouchDB's maintenance documentation](http://couchdb.readthedocs.org/en/latest/maintenance/compaction.html) for more details.
+
+Also see [auto-compaction](#create_database), which runs compaction automatically (local databases only).
+
+* `options.interval`: Number of milliseconds to wait before asking again if compaction is already done. Defaults to 200. (Only applies to remote databases.)
+
+#### Example Response:
+{% highlight js %}
+{
+  "ok" : "true"
+}
+{% endhighlight %}
 
 {% include anchor.html title="Document revisions diff" hash="revisions_diff" %}
 
